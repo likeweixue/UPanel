@@ -1,56 +1,65 @@
 package main
 
 import (
-    "fmt"
-    "net/http"
-    
-    "github.com/gin-gonic/gin"
-    "github.com/moby/moby/client"
+	"fmt"
+	"log"
+
+	"upanel/internal/handler"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-    // 1. 测试 Docker 连接
-    cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-    if err != nil {
-        fmt.Println("⚠️ Docker 连接失败:", err)
-    } else {
-        fmt.Println("✅ Docker 连接成功")
-        defer cli.Close()
-    }
-    
-    // 2. 创建 Gin 路由
-    r := gin.Default()
-    
-    // 3. 首页
-    r.GET("/", func(c *gin.Context) {
-    c.JSON(http.StatusOK, gin.H{
-        "message": "UPanel API 服务运行中",
-        "status":  "ok",
-    })
-})
-    
-    // 4. API 示例：获取 Docker 版本
-    r.GET("/api/docker/version", func(c *gin.Context) {
-        if cli == nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Docker 未连接"})
-            return
-        }
-        version, err := cli.ServerVersion(c.Request.Context(), client.ServerVersionOptions{})
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
-        c.JSON(http.StatusOK, gin.H{
-            "version": version.Version,
-            "api":     version.APIVersion,
-        })
-    })
-    
-    // 5. 加载 HTML 模板
-    // r.LoadHTMLGlob("web/templates/*")  // 前端已分离，不再需要
-    
-    // 6. 启动服务器
-    fmt.Println("🚀 UPanel 启动成功")
-    fmt.Println("📍 http://localhost:8080")
-    r.Run(":8080")
+	r := gin.Default()
+
+	// 允许跨域（开发用）
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
+	// API 路由
+	api := r.Group("/api")
+	{
+		// 系统信息
+		systemHandler, err := handler.NewSystemHandler()
+		if err != nil {
+			log.Printf("系统服务初始化失败: %v", err)
+		} else {
+			defer systemHandler.Close()
+			api.GET("/system/info", systemHandler.GetInfo)
+		}
+
+		// Docker 版本
+		api.GET("/docker/version", func(c *gin.Context) {
+			c.JSON(200, gin.H{"version": "Docker v29.4.0"})
+		})
+
+		// 容器管理
+		containerHandler, err := handler.NewContainerHandler()
+		if err != nil {
+			log.Printf("容器服务初始化失败: %v", err)
+		} else {
+			defer containerHandler.Close()
+			containers := api.Group("/containers")
+			{
+				containers.GET("/", containerHandler.List)
+				containers.POST("/:id/start", containerHandler.Start)
+				containers.POST("/:id/stop", containerHandler.Stop)
+				containers.POST("/:id/restart", containerHandler.Restart)
+				containers.DELETE("/:id", containerHandler.Remove)
+				containers.GET("/:id/logs", containerHandler.Logs)
+			}
+		}
+	}
+
+	fmt.Println("🚀 UPanel 启动成功")
+	fmt.Println("📍 http://localhost:8080")
+	r.Run(":8080")
 }

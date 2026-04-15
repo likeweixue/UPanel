@@ -39,15 +39,23 @@
 
 <script setup>
 import { 
-  Monitor, Shop, DataBoard, Folder, Setting, SwitchButton 
+  Monitor, 
+  Shop, 
+  DataBoard, 
+  Folder, 
+  Setting, 
+  SwitchButton,
+  Box  // 添加 Box 图标
 } from '@element-plus/icons-vue'
 
 const menuItems = [
   { path: '/dashboard', name: '总览', icon: Monitor },
+  { path: '/containers', name: '容器管理', icon: Box },
   { path: '/apps', name: '应用商店', icon: Shop },
   { path: '/websites', name: '网站', icon: DataBoard },
   { path: '/databases', name: '数据库', icon: DataBoard },
   { path: '/files', name: '文件管理', icon: Folder },
   { path: '/settings', name: '面板设置', icon: Setting },
+  
 ]
 </script>

@@ -14,6 +14,7 @@ const routes = [
       { path: 'files', component: () => import('@/views/Files.vue'), meta: { title: '文件管理' } },
       { path: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '面板设置' } },
       { path: 'logout', component: () => import('@/views/Logout.vue'), meta: { title: '退出面板' } },
+      { path: 'containers', component: () => import('@/views/Containers.vue'), meta: { title: '容器管理' } },
     ]
   }
 ]
