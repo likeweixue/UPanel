@@ -1,20 +1,30 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import MainLayout from '@/layouts/MainLayout.vue'
+
+const isAuthenticated = () => {
+  return !!localStorage.getItem('token')
+}
 
 const routes = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/auth/Login.vue'),
+    meta: { public: true }
+  },
+  {
     path: '/',
-    component: MainLayout,
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { requiresAuth: true },
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '总览' } },
+      { path: 'containers', component: () => import('@/views/Containers.vue'), meta: { title: '容器管理' } },
       { path: 'apps', component: () => import('@/views/Apps.vue'), meta: { title: '应用商店' } },
       { path: 'websites', component: () => import('@/views/Websites.vue'), meta: { title: '网站' } },
       { path: 'databases', component: () => import('@/views/Databases.vue'), meta: { title: '数据库' } },
       { path: 'files', component: () => import('@/views/Files.vue'), meta: { title: '文件管理' } },
       { path: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '面板设置' } },
-      { path: 'logout', component: () => import('@/views/Logout.vue'), meta: { title: '退出面板' } },
-      { path: 'containers', component: () => import('@/views/Containers.vue'), meta: { title: '容器管理' } },
+      { path: 'logout', component: () => import('@/views/Logout.vue'), meta: { title: '退出面板' } }
     ]
   }
 ]
@@ -22,6 +32,16 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth && !isAuthenticated()) {
+    next('/login')
+  } else if (to.path === '/login' && isAuthenticated()) {
+    next('/')
+  } else {
+    next()
+  }
 })
 
 export default router

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"upanel/internal/handler"
+	"upanel/internal/middleware" // 新增
 
 	"github.com/gin-gonic/gin"
 )
@@ -85,7 +86,41 @@ func main() {
 				websites.DELETE("/:domain", websiteHandler.Delete)
 				websites.GET("/:domain/url", websiteHandler.GetURL)
 			}
+		} // 数据库管理
+		databaseHandler, err := handler.NewDatabaseHandler()
+		if err != nil {
+			log.Printf("数据库服务初始化失败: %v", err)
+		} else {
+			defer databaseHandler.Close()
+			databases := api.Group("/databases")
+			{
+				databases.POST("/", databaseHandler.Create)
+				databases.GET("/", databaseHandler.List)
+				databases.POST("/:name/start", databaseHandler.Start)
+				databases.POST("/:name/stop", databaseHandler.Stop)
+				databases.POST("/:name/restart", databaseHandler.Restart)
+				databases.DELETE("/:name", databaseHandler.Delete)
+				databases.GET("/:name/connection", databaseHandler.GetConnectionInfo)
+			}
+		} // 认证相关（不需要认证）
+		authHandler := handler.NewAuthHandler()
+		api.POST("/auth/login", authHandler.Login)
+		api.POST("/auth/logout", authHandler.Logout)
+
+		// 需要认证的路由组
+		authorized := api.Group("/")
+		authorized.Use(middleware.AuthMiddleware())
+		{
+			// 用户信息
+			authorized.GET("/auth/userinfo", authHandler.GetUserInfo)
+			authorized.POST("/auth/change-password", authHandler.ChangePassword)
+
+			// 系统设置
+			settingsHandler := handler.NewSettingsHandler()
+			authorized.GET("/settings", settingsHandler.GetAll)
+			authorized.PUT("/settings", settingsHandler.Update)
 		}
+
 	}
 
 	fmt.Println("🚀 UPanel 启动成功")
