@@ -57,6 +57,35 @@ func main() {
 				containers.GET("/:id/logs", containerHandler.Logs)
 			}
 		}
+
+		// 文件管理
+		fileHandler := handler.NewFileHandler()
+		files := api.Group("/files")
+		{
+			files.GET("/list", fileHandler.List)
+			files.GET("/content", fileHandler.GetContent)
+			files.POST("/content", fileHandler.SaveContent)
+			files.POST("/folder", fileHandler.CreateFolder)
+			files.POST("/file", fileHandler.CreateFile)
+			files.PUT("/rename", fileHandler.Rename)
+			files.DELETE("/delete", fileHandler.Delete)
+			files.POST("/upload", fileHandler.Upload)
+		} // 网站管理
+		websiteHandler, err := handler.NewWebsiteHandler()
+		if err != nil {
+			log.Printf("网站服务初始化失败: %v", err)
+		} else {
+			defer websiteHandler.Close()
+			websites := api.Group("/websites")
+			{
+				websites.POST("/", websiteHandler.Create)
+				websites.GET("/", websiteHandler.List)
+				websites.POST("/:domain/start", websiteHandler.Start)
+				websites.POST("/:domain/stop", websiteHandler.Stop)
+				websites.DELETE("/:domain", websiteHandler.Delete)
+				websites.GET("/:domain/url", websiteHandler.GetURL)
+			}
+		}
 	}
 
 	fmt.Println("🚀 UPanel 启动成功")
