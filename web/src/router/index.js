@@ -23,6 +23,11 @@ const routes = [
       { path: 'websites', component: () => import('@/views/Websites.vue'), meta: { title: '网站' } },
       { path: 'databases', component: () => import('@/views/Databases.vue'), meta: { title: '数据库' } },
       { path: 'files', component: () => import('@/views/Files.vue'), meta: { title: '文件管理' } },
+      // 主机子菜单页面
+      { path: 'ssh', component: () => import('@/views/Ssh.vue'), meta: { title: 'SSH管理' } },
+      { path: 'security', component: () => import('@/views/Security.vue'), meta: { title: '安全设置' } },
+      // 计划任务
+      { path: 'cron', component: () => import('@/views/Cron.vue'), meta: { title: '计划任务' } },
       { path: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '面板设置' } },
       { path: 'logout', component: () => import('@/views/Logout.vue'), meta: { title: '退出面板' } }
     ]
