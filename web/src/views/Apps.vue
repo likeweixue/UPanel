@@ -58,6 +58,11 @@
               <el-input-number v-model="installForm.config.port" :min="80" :max="8080" />
             </el-form-item>
           </template>
+          <template v-if="selectedApp?.key === 'wordpress'">
+            <el-form-item label="端口">
+              <el-input-number v-model="installForm.config.port" :min="80" :max="8099" />
+            </el-form-item>
+          </template>
         </el-form>
         <div class="drawer-footer">
           <el-button @click="drawerVisible = false">取消</el-button>
@@ -144,7 +149,20 @@
       </div>
     </el-drawer>
 
-    <!-- 日志抽屉 -->
+    <!-- 安装日志抽屉 -->
+    <el-drawer v-model="installLogDrawerVisible" title="安装日志" direction="rtl" size="700px" :close-on-click-modal="false">
+      <div class="logs-content">
+        <div class="log-controls">
+          <el-button size="small" @click="copyLogs" :disabled="!installLogs">复制日志</el-button>
+          <el-button size="small" @click="clearInstallLogs" :disabled="!installLogs">清空</el-button>
+        </div>
+        <div class="log-container" ref="logContainerRef">
+          <pre class="log-pre">{{ installLogs || '等待安装开始...' }}</pre>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 容器日志抽屉 -->
     <el-drawer v-model="logDrawerVisible" title="容器日志" direction="rtl" size="600px">
       <div class="logs-content">
         <div class="log-controls">
@@ -158,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import { RefreshRight, VideoPause, VideoPlay, Document, Monitor, Folder, Delete } from '@element-plus/icons-vue'
@@ -168,12 +186,17 @@ const activeStatus = ref('all')
 const drawerVisible = ref(false)
 const detailDrawerVisible = ref(false)
 const logDrawerVisible = ref(false)
+const installLogDrawerVisible = ref(false)
 const installing = ref(false)
 const actionLoading = ref(false)
 const selectedApp = ref(null)
 const currentApp = ref(null)
 const containerInfo = ref({})
 const containerLogs = ref('')
+const installLogs = ref('')
+let logInterval = null
+let logStep = 0
+const logContainerRef = ref(null)
 
 const installForm = ref({
   name: '',
@@ -186,7 +209,8 @@ const leftCategories = [
   { key: 'web', name: 'Web服务器' },
   { key: 'database', name: '数据库' },
   { key: 'environment', name: '环境' },
-  { key: 'tools', name: '工具' }
+  { key: 'tools', name: '工具' },
+  { key: 'website', name: '建站' }
 ]
 
 const rightCategories = [
@@ -196,6 +220,34 @@ const rightCategories = [
 ]
 
 const apps = ref([])
+
+// 模拟安装日志步骤
+const getInstallSteps = (appName, version, port) => {
+  const now = new Date()
+  const timeStr = now.toLocaleString()
+  return [
+    `[${timeStr}] 🚀 开始安装应用 [${appName}]`,
+    `[${timeStr}] 📦 准备安装包...`,
+    `[${timeStr}] 🔍 检查依赖环境...`,
+    `[${timeStr}] ✅ 依赖检查通过`,
+    `[${timeStr}] 🐳 开始拉取镜像...`,
+    `[${timeStr}] 📥 拉取镜像: ${appName}:${version}`,
+    `[${timeStr}] ⏳ 下载中... 0%`,
+    `[${timeStr}] ⏳ 下载中... 25%`,
+    `[${timeStr}] ⏳ 下载中... 50%`,
+    `[${timeStr}] ⏳ 下载中... 75%`,
+    `[${timeStr}] ⏳ 下载中... 100%`,
+    `[${timeStr}] ✅ 镜像拉取成功`,
+    `[${timeStr}] 🐳 创建容器...`,
+    `[${timeStr}] 🔧 配置容器参数`,
+    port ? `[${timeStr}] 🔌 端口映射: ${port}:80` : '',
+    `[${timeStr}] 🚀 启动容器...`,
+    `[${timeStr}] ✅ 容器启动成功`,
+    `[${timeStr}] 🔄 执行初始化脚本...`,
+    `[${timeStr}] ✅ 初始化完成`,
+    `[${timeStr}] 🎉 应用 [${appName}] 安装完成！`
+  ].filter(step => step)
+}
 
 const fetchContainers = async () => {
   try {
@@ -331,7 +383,7 @@ const openTerminal = () => {
 }
 
 const openFileDir = () => {
-  const dir = `/Users/machangsheng/Downloads/Upanel/apps/${currentApp.value.key}-test5`
+  const dir = `/Users/machangsheng/Downloads/Upanel/apps/${currentApp.value.key}`
   ElMessage.info(`打开目录: ${dir}`)
 }
 
@@ -385,12 +437,63 @@ const openInstallDrawer = (app) => {
 }
 
 const getDefaultPort = (key) => {
-  const ports = { nginx: 8080, openresty: 8080, mysql: 3306, postgresql: 5432, redis: 6379 }
+  const ports = { nginx: 8080, openresty: 8080, mysql: 3306, postgresql: 5432, redis: 6379, wordpress: 8090 }
   return ports[key] || 8080
 }
 
+const copyLogs = () => {
+  if (installLogs.value) {
+    navigator.clipboard.writeText(installLogs.value)
+    ElMessage.success('日志已复制到剪贴板')
+  }
+}
+
+const clearInstallLogs = () => {
+  installLogs.value = ''
+  ElMessage.success('日志已清空')
+}
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (logContainerRef.value) {
+      const preElement = logContainerRef.value.querySelector('pre')
+      if (preElement) {
+        preElement.scrollTop = preElement.scrollHeight
+      }
+    }
+  })
+}
+
 const confirmInstall = async () => {
+  if (!installForm.value.version) {
+    ElMessage.warning('请选择版本')
+    return
+  }
+  
+  // 打开日志抽屉
+  installLogs.value = ''
+  installLogDrawerVisible.value = true
   installing.value = true
+  
+  const steps = getInstallSteps(
+    selectedApp.value.name, 
+    installForm.value.version,
+    installForm.value.config.port
+  )
+  logStep = 0
+  
+  // 开始模拟日志输出
+  logInterval = setInterval(() => {
+    if (logStep < steps.length) {
+      installLogs.value += steps[logStep] + '\n'
+      logStep++
+      scrollToBottom()
+    } else {
+      if (logInterval) clearInterval(logInterval)
+      logInterval = null
+    }
+  }, 300)
+  
   try {
     await axios.post('/api/apps/install', {
       app_key: selectedApp.value.key,
@@ -398,10 +501,27 @@ const confirmInstall = async () => {
       name: installForm.value.name,
       config: installForm.value.config
     })
-    ElMessage.success('安装成功！')
-    drawerVisible.value = false
-    await fetchApps()
+    
+    // 等待日志完成
+    const waitForLogs = () => {
+      if (logStep >= steps.length) {
+        if (logInterval) clearInterval(logInterval)
+        logInterval = null
+        ElMessage.success('安装成功！')
+        drawerVisible.value = false
+        setTimeout(() => {
+          fetchApps()
+        }, 1000)
+      } else {
+        setTimeout(waitForLogs, 500)
+      }
+    }
+    waitForLogs()
   } catch (err) {
+    if (logInterval) clearInterval(logInterval)
+    logInterval = null
+    installLogs.value += `\n[${new Date().toLocaleString()}] ❌ 安装失败: ${err.response?.data?.error || err.message}\n`
+    scrollToBottom()
     ElMessage.error('安装失败: ' + (err.response?.data?.error || err.message))
   } finally {
     installing.value = false
@@ -410,6 +530,13 @@ const confirmInstall = async () => {
 
 onMounted(() => {
   fetchApps()
+})
+
+onUnmounted(() => {
+  if (logInterval) {
+    clearInterval(logInterval)
+    logInterval = null
+  }
 })
 </script>
 
@@ -453,5 +580,6 @@ onMounted(() => {
 /* 日志样式 */
 .logs-content { height: 100%; display: flex; flex-direction: column; gap: 12px; }
 .log-controls { display: flex; gap: 8px; }
-.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: monospace; font-size: 12px; overflow-x: auto; flex: 1; white-space: pre-wrap; }
+.log-container { flex: 1; overflow-y: auto; }
+.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; margin: 0; min-height: 300px; }
 </style>
