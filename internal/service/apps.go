@@ -1,0 +1,288 @@
+package service
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/docker/docker/client"
+)
+
+type App struct {
+	ID          string   `json:"id"`
+	Key         string   `json:"key"`
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Description string   `json:"description"`
+	Icon        string   `json:"icon"`
+	Versions    []string `json:"versions"`
+	DefaultVersion string `json:"default_version"`
+	Installed   bool     `json:"installed"`
+	InstalledVersion string `json:"installed_version"`
+}
+
+type InstallAppRequest struct {
+	AppKey  string                 `json:"app_key"`
+	Version string                 `json:"version"`
+	Name    string                 `json:"name"`
+	Config  map[string]interface{} `json:"config"`
+}
+
+type AppService struct {
+	cli      *client.Client
+	dataPath string
+}
+
+func NewAppService() (*AppService, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	
+	dataPath := "/Users/machangsheng/Downloads/Upanel/apps"
+	os.MkdirAll(dataPath, 0755)
+	
+	return &AppService{
+		cli:      cli,
+		dataPath: dataPath,
+	}, nil
+}
+
+func (s *AppService) Close() error {
+	return s.cli.Close()
+}
+
+func (s *AppService) GetApps() []App {
+	return []App{
+		{ID: "1", Key: "nginx", Name: "Nginx", Category: "web", Description: "高性能的HTTP和反向代理服务器", Icon: "Monitor", Versions: []string{"1.24", "1.22"}, DefaultVersion: "1.24"},
+		{ID: "2", Key: "openresty", Name: "OpenResty", Category: "web", Description: "基于Nginx与Lua的高性能Web平台", Icon: "Monitor", Versions: []string{"latest"}, DefaultVersion: "latest"},
+		{ID: "3", Key: "mysql", Name: "MySQL", Category: "database", Description: "流行的关系型数据库", Icon: "Coin", Versions: []string{"8.0", "5.7"}, DefaultVersion: "8.0"},
+		{ID: "4", Key: "postgresql", Name: "PostgreSQL", Category: "database", Description: "强大的开源关系型数据库", Icon: "Coin", Versions: []string{"15", "14"}, DefaultVersion: "15"},
+		{ID: "5", Key: "redis", Name: "Redis", Category: "database", Description: "高性能的键值对数据库", Icon: "Connection", Versions: []string{"7.2"}, DefaultVersion: "7.2"},
+		{ID: "6", Key: "php", Name: "PHP", Category: "environment", Description: "流行的通用脚本语言", Icon: "Document", Versions: []string{"8.2", "8.1", "8.0", "7.4"}, DefaultVersion: "8.2"},
+		{ID: "7", Key: "phpmyadmin", Name: "phpMyAdmin", Category: "tools", Description: "MySQL可视化管理工具", Icon: "Tools", Versions: []string{"latest"}, DefaultVersion: "latest"},
+		{ID: "8", Key: "wordpress", Name: "WordPress", Category: "website", Description: "流行的博客和内容管理系统", Icon: "Document", Versions: []string{"latest", "6.4"}, DefaultVersion: "latest"},
+	}
+}
+
+func (s *AppService) InstallApp(req *InstallAppRequest) error {
+	appPath := filepath.Join(s.dataPath, req.Name)
+	if err := os.MkdirAll(appPath, 0755); err != nil {
+		return err
+	}
+	
+	// 创建 html 目录
+	htmlPath := filepath.Join(appPath, "html")
+	os.MkdirAll(htmlPath, 0755)
+	
+	composeContent := s.generateDockerCompose(req, appPath)
+	composePath := filepath.Join(appPath, "docker-compose.yml")
+	if err := os.WriteFile(composePath, []byte(composeContent), 0644); err != nil {
+		return err
+	}
+	
+	cmd := exec.Command("docker", "compose", "-f", composePath, "up", "-d")
+	cmd.Dir = appPath
+	return cmd.Run()
+}
+
+func (s *AppService) generateDockerCompose(req *InstallAppRequest, appPath string) string {
+	switch req.AppKey {
+	case "nginx":
+		return s.generateNginxCompose(req, appPath)
+	case "openresty":
+		return s.generateOpenRestyCompose(req, appPath)
+	case "mysql":
+		return s.generateMySQLCompose(req, appPath)
+	case "postgresql":
+		return s.generatePostgreSQLCompose(req, appPath)
+	case "redis":
+		return s.generateRedisCompose(req, appPath)
+	case "php":
+		return s.generatePHPCompose(req, appPath)
+	case "wordpress":
+		return s.generateWordPressCompose(req, appPath)
+	default:
+		return s.generateDefaultCompose(req, appPath)
+	}
+}
+
+func (s *AppService) generateWordPressCompose(req *InstallAppRequest, appPath string) string {
+	port := "8080"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	dbPassword := "wordpress123"
+	if p, ok := req.Config["db_password"].(string); ok && p != "" {
+		dbPassword = p
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+
+services:
+  wordpress:
+    image: wordpress:%s
+    container_name: upanel_%s
+    ports:
+      - "%s:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: %s
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - %s/html:/var/www/html
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: upanel_%s_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: %s
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: %s
+    volumes:
+      - %s/mysql:/var/lib/mysql
+    restart: unless-stopped
+
+networks:
+  default:
+    name: upanel_network
+    external: true
+`, req.Version, req.Name, port, dbPassword, appPath, req.Name, dbPassword, dbPassword, appPath)
+}
+
+func (s *AppService) generateNginxCompose(req *InstallAppRequest, appPath string) string {
+	port := "8080"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+services:
+  nginx:
+    image: nginx:%s
+    container_name: upanel_%s
+    ports:
+      - "%s:80"
+    volumes:
+      - %s/html:/usr/share/nginx/html
+      - %s/conf:/etc/nginx/conf.d
+    restart: unless-stopped
+`, req.Version, req.Name, port, appPath, appPath)
+}
+
+func (s *AppService) generateOpenRestyCompose(req *InstallAppRequest, appPath string) string {
+	port := "8080"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+services:
+  openresty:
+    image: openresty/openresty:%s
+    container_name: upanel_%s
+    ports:
+      - "%s:80"
+    volumes:
+      - %s/html:/usr/local/openresty/nginx/html
+      - %s/conf:/etc/nginx/conf.d
+    restart: unless-stopped
+`, req.Version, req.Name, port, appPath, appPath)
+}
+
+func (s *AppService) generateMySQLCompose(req *InstallAppRequest, appPath string) string {
+	port := "3306"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	password := "root123"
+	if p, ok := req.Config["password"].(string); ok && p != "" {
+		password = p
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+services:
+  mysql:
+    image: mysql:%s
+    container_name: upanel_%s
+    environment:
+      MYSQL_ROOT_PASSWORD: %s
+    ports:
+      - "%s:3306"
+    volumes:
+      - %s/data:/var/lib/mysql
+    restart: unless-stopped
+`, req.Version, req.Name, password, port, appPath)
+}
+
+func (s *AppService) generatePostgreSQLCompose(req *InstallAppRequest, appPath string) string {
+	port := "5432"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	password := "postgres123"
+	if p, ok := req.Config["password"].(string); ok && p != "" {
+		password = p
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+services:
+  postgres:
+    image: postgres:%s
+    container_name: upanel_%s
+    environment:
+      POSTGRES_PASSWORD: %s
+    ports:
+      - "%s:5432"
+    volumes:
+      - %s/data:/var/lib/postgresql/data
+    restart: unless-stopped
+`, req.Version, req.Name, password, port, appPath)
+}
+
+func (s *AppService) generateRedisCompose(req *InstallAppRequest, appPath string) string {
+	port := "6379"
+	if p, ok := req.Config["port"].(int); ok && p > 0 {
+		port = fmt.Sprintf("%d", p)
+	}
+	
+	return fmt.Sprintf(`version: '3.8'
+services:
+  redis:
+    image: redis:%s
+    container_name: upanel_%s
+    ports:
+      - "%s:6379"
+    volumes:
+      - %s/data:/data
+    restart: unless-stopped
+`, req.Version, req.Name, port, appPath)
+}
+
+func (s *AppService) generatePHPCompose(req *InstallAppRequest, appPath string) string {
+	return fmt.Sprintf(`version: '3.8'
+services:
+  php:
+    image: php:%s-fpm
+    container_name: upanel_%s
+    volumes:
+      - %s/www:/var/www/html
+    restart: unless-stopped
+`, req.Version, req.Name, appPath)
+}
+
+func (s *AppService) generateDefaultCompose(req *InstallAppRequest, appPath string) string {
+	return fmt.Sprintf(`version: '3.8'
+services:
+  app:
+    image: %s:%s
+    container_name: upanel_%s
+    restart: unless-stopped
+`, req.AppKey, req.Version, req.Name)
+}
