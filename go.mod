@@ -6,6 +6,7 @@ require (
 	github.com/docker/docker v20.10.24+incompatible
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/crypto v0.50.0
 )
