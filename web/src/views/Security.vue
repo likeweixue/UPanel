@@ -549,7 +549,7 @@ const saveAllSettings = async () => {
 const refreshSettings = () => {
   ElMessage.success('刷新成功')
   // 刷新图表数据
-  initMapChart()
+  // initMapChart()
   initTrendChart()
   initTypeChart()
 }
@@ -612,7 +612,7 @@ const handleResize = () => {
 
 onMounted(() => {
   setTimeout(() => {
-    initMapChart()
+    // initMapChart()
     initTrendChart()
     initTypeChart()
     initTrafficChart()
@@ -883,5 +883,18 @@ onUnmounted(() => {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
+}
+</style>
+<style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+.top-panel .el-tabs__item {
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
 }
 </style>

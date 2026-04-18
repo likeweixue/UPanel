@@ -189,3 +189,11 @@ onUnmounted(() => {
   padding: 8px;
 }
 </style>
+<style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+</style>

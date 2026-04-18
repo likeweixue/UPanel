@@ -46,7 +46,7 @@
     <div class="websites-panel">
       <el-table 
         :data="filteredWebsites" 
-        stripe 
+        
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
@@ -798,5 +798,16 @@ const handleCommand = (command, website) => {
   font-size: 14px;
   font-weight: 600;
   color: #1f2937;
+}
+</style><style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+.top-panel .el-input__wrapper {
+  height: 28px !important;
+  padding: 0 8px !important;
 }
 </style>

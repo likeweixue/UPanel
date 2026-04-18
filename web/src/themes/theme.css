@@ -1,0 +1,87 @@
+/* CSS 变量定义 */
+:root {
+  --theme-primary: #477779;
+  --theme-primary-light: #5e8a8c;
+  --theme-primary-dark: #2d5a5c;
+  --theme-bg: #f1f1f1;
+  --theme-card-bg: #ffffff;
+  --theme-text: #1f2937;
+  --theme-text-secondary: #6b7280;
+  --theme-border: #e5e7eb;
+  --theme-success: #2e7d32;
+  --theme-warning: #ed6c02;
+  --theme-danger: #c62828;
+  --theme-info: #477779;
+}
+
+/* 应用主题变量到实际样式 */
+body {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+.sidebar,
+.top-bar,
+.footer,
+.stats-panel,
+.gauges-panel,
+.chart-panel,
+.info-panel,
+.notification-panel,
+.categories-panel,
+.apps-panel,
+.files-panel,
+.content-panel,
+.settings-section,
+.chart-card,
+.process-card,
+.top-panel,
+.breadcrumb-panel,
+.websites-panel,
+.databases-panel,
+.containers-panel {
+  background-color: var(--theme-card-bg) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.logo {
+  color: var(--theme-primary) !important;
+}
+
+.menu-item.active {
+  background-color: var(--theme-primary) !important;
+}
+
+.menu-item:hover {
+  background-color: var(--theme-border) !important;
+}
+
+.submenu-item.active {
+  background-color: var(--theme-primary-light) !important;
+}
+
+.el-button--primary {
+  background-color: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+}
+
+.el-button--primary:hover {
+  background-color: var(--theme-primary-light) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--theme-primary) !important;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--theme-primary) !important;
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+}
+
+.el-switch.is-checked .el-switch__core {
+  background-color: var(--theme-primary) !important;
+}

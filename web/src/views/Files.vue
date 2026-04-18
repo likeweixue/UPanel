@@ -74,7 +74,7 @@
     <div class="files-panel">
       <el-table 
         :data="filteredFiles" 
-        stripe 
+        
         style="width: 100%"
         @selection-change="handleSelectionChange"
         @row-dblclick="openItem"
@@ -180,7 +180,7 @@
     <!-- 回收站抽屉 -->
     <el-drawer v-model="recycleDrawerVisible" title="回收站" direction="rtl" size="500px">
       <div class="recycle-content">
-        <el-table :data="recycleBin" stripe style="width: 100%">
+        <el-table :data="recycleBin" style="width: 100%">
           <el-table-column prop="name" label="名称" min-width="180" />
           <el-table-column prop="originalPath" label="原路径" min-width="200" />
           <el-table-column prop="deleteTime" label="删除时间" width="160" />

@@ -6,7 +6,10 @@ import router from './router'
 import axios from 'axios'
 import App from './App.vue'
 import './style.css'
+import './themes/theme.css'
+import { initTheme } from './themes'
 
+// 配置 axios 拦截器
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) {
@@ -26,8 +29,12 @@ axios.interceptors.response.use(
   }
 )
 
+// 初始化主题
+initTheme()
+
 const app = createApp(App)
 
+// 注册所有图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }

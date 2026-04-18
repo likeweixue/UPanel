@@ -36,7 +36,7 @@
     <div class="databases-panel">
       <el-table 
         :data="filteredDatabases" 
-        stripe 
+        
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
@@ -1112,5 +1112,22 @@ const handleCommand = (command, db) => {
 .backup-item-actions {
   display: flex;
   gap: 8px;
+}
+</style>
+<style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+.top-panel .el-input__wrapper {
+  height: 28px !important;
+  padding: 0 8px !important;
+}
+.top-panel .el-tabs__item {
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
 }
 </style>

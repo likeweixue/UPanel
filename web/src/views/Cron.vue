@@ -26,7 +26,7 @@
 
     <!-- 任务表格 -->
     <div class="content-panel">
-      <el-table :data="filteredTasks" stripe style="width: 100%" @selection-change="handleSelectionChange">
+      <el-table :data="filteredTasks" style="width: 100%" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
@@ -726,5 +726,17 @@ const handleTaskCommand = (cmd, task) => {
 
 .task-logs {
   padding: 8px 0;
+}
+</style>
+<style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+.top-panel .el-input__wrapper {
+  height: 28px !important;
+  padding: 0 8px !important;
 }
 </style>

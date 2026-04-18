@@ -1,0 +1,76 @@
+/* 自定义 Element Plus 主题色 */
+:root {
+  --el-color-primary: #477779;
+  --el-color-primary-light-3: #5e8a8c;
+  --el-color-primary-light-5: #7a9fa1;
+  --el-color-primary-light-7: #9cb5b6;
+  --el-color-primary-light-9: #cde0e0;
+  --el-color-primary-dark-2: #2d5a5c;
+}
+
+.el-button--primary {
+  --el-button-bg-color: #477779;
+  --el-button-border-color: #477779;
+  --el-button-hover-bg-color: #5e8a8c;
+  --el-button-hover-border-color: #5e8a8c;
+  --el-button-active-bg-color: #2d5a5c;
+  --el-button-active-border-color: #2d5a5c;
+}
+
+.el-tabs__item.is-active {
+  color: #477779;
+}
+
+.el-tabs__active-bar {
+  background-color: #477779;
+}
+
+.el-tabs__item:hover {
+  color: #477779;
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: #477779;
+  border-color: #477779;
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: #477779;
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: #477779;
+  border-color: #477779;
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: #477779;
+}
+
+.el-switch.is-checked .el-switch__core {
+  background-color: #477779;
+  border-color: #477779;
+}
+
+.el-pagination .el-pager li.is-active {
+  background-color: #477779;
+  color: white;
+}
+
+.el-pagination .el-pager li:hover {
+  color: #477779;
+}
+
+.el-link.el-link--primary {
+  --el-link-hover-text-color: #5e8a8c;
+  color: #477779;
+}
+
+.el-select .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px #477779 inset;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #477779 inset;
+}

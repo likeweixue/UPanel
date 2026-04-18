@@ -186,3 +186,30 @@ onMounted(() => {
   margin-top: 8px;
 }
 </style>
+
+<style scoped>
+/* 暗色模式支持 */
+body.dark-mode .logout-container {
+  background-color: #1a1a1a;
+}
+
+body.dark-mode .logout-info {
+  background-color: #2a2a2a;
+}
+
+body.dark-mode .info-label {
+  color: #9ca3af;
+}
+
+body.dark-mode .info-value {
+  color: #e5e7eb;
+}
+
+body.dark-mode .logout-title {
+  color: #e5e7eb;
+}
+
+body.dark-mode .logout-desc {
+  color: #9ca3af;
+}
+</style>

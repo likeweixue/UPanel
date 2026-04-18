@@ -1,6 +1,5 @@
 <template>
   <div class="apps-container">
-    <!-- 分类面板 -->
     <div class="categories-panel">
       <div class="categories-left">
         <div class="category-group">
@@ -19,7 +18,6 @@
       </div>
     </div>
 
-    <!-- 应用列表 -->
     <div class="apps-panel">
       <div class="apps-grid">
         <div v-for="app in filteredApps" :key="app.id" class="app-card" @click="openAppDetail(app)">
@@ -53,12 +51,7 @@
               <el-option v-for="v in availableVersions" :key="v" :label="v" :value="v" />
             </el-select>
           </el-form-item>
-          <template v-if="selectedApp?.key === 'nginx' || selectedApp?.key === 'openresty'">
-            <el-form-item label="端口">
-              <el-input-number v-model="installForm.config.port" :min="80" :max="8080" />
-            </el-form-item>
-          </template>
-          <template v-if="selectedApp?.key === 'wordpress'">
+          <template v-if="selectedApp?.key === 'nginx' || selectedApp?.key === 'openresty' || selectedApp?.key === 'wordpress'">
             <el-form-item label="端口">
               <el-input-number v-model="installForm.config.port" :min="80" :max="8099" />
             </el-form-item>
@@ -118,33 +111,14 @@
         <div class="detail-section">
           <div class="section-title">操作</div>
           <div class="action-buttons">
-            <el-button size="small" @click="restartContainer" :loading="actionLoading">
-              <el-icon><RefreshRight /></el-icon> 重启
-            </el-button>
-            <el-button size="small" @click="stopContainer" :loading="actionLoading" v-if="containerInfo?.status === 'running'">
-              <el-icon><VideoPause /></el-icon> 停止
-            </el-button>
-            <el-button size="small" @click="startContainer" :loading="actionLoading" v-else>
-              <el-icon><VideoPlay /></el-icon> 启动
-            </el-button>
-            <el-button size="small" @click="openLogs">
-              <el-icon><Document /></el-icon> 日志
-            </el-button>
-            <el-button size="small" @click="openTerminal">
-              <el-icon><Monitor /></el-icon> 终端
-            </el-button>
-            <el-button size="small" @click="openFileDir">
-              <el-icon><Folder /></el-icon> 文件
-            </el-button>
-            <el-button size="small" type="danger" @click="uninstallApp">
-              <el-icon><Delete /></el-icon> 卸载
-            </el-button>
+            <el-button size="small" @click="restartContainer" :loading="actionLoading">重启</el-button>
+            <el-button size="small" @click="stopContainer" :loading="actionLoading" v-if="containerInfo?.status === 'running'">停止</el-button>
+            <el-button size="small" @click="startContainer" :loading="actionLoading" v-else>启动</el-button>
+            <el-button size="small" @click="openLogs">日志</el-button>
+            <el-button size="small" @click="openTerminal">终端</el-button>
+            <el-button size="small" @click="openFileDir">文件</el-button>
+            <el-button size="small" type="danger" @click="uninstallApp">卸载</el-button>
           </div>
-        </div>
-
-        <div class="detail-section" v-if="containerInfo?.inspect">
-          <div class="section-title">容器详情</div>
-          <pre class="container-inspect">{{ JSON.stringify(containerInfo.inspect, null, 2) }}</pre>
         </div>
       </div>
     </el-drawer>
@@ -179,7 +153,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import { RefreshRight, VideoPause, VideoPlay, Document, Monitor, Folder, Delete } from '@element-plus/icons-vue'
 
 const activeCategory = ref('all')
 const activeStatus = ref('all')
@@ -221,7 +194,6 @@ const rightCategories = [
 
 const apps = ref([])
 
-// 模拟安装日志步骤
 const getInstallSteps = (appName, version, port) => {
   const now = new Date()
   const timeStr = now.toLocaleString()
@@ -239,7 +211,6 @@ const getInstallSteps = (appName, version, port) => {
     `[${timeStr}] ⏳ 下载中... 100%`,
     `[${timeStr}] ✅ 镜像拉取成功`,
     `[${timeStr}] 🐳 创建容器...`,
-    `[${timeStr}] 🔧 配置容器参数`,
     port ? `[${timeStr}] 🔌 端口映射: ${port}:80` : '',
     `[${timeStr}] 🚀 启动容器...`,
     `[${timeStr}] ✅ 容器启动成功`,
@@ -254,14 +225,11 @@ const fetchContainers = async () => {
     const res = await axios.get('/api/containers/')
     const containers = res.data.data || []
     const containerNames = containers.map(c => c.name)
-    
     apps.value = apps.value.map(app => {
       const isInstalled = containerNames.some(name => name.includes(app.key))
       return { ...app, installed: isInstalled }
     })
-  } catch (err) {
-    console.error('获取容器列表失败:', err)
-  }
+  } catch (err) { console.error('获取容器列表失败:', err) }
 }
 
 const fetchContainerInfo = async (appKey) => {
@@ -269,7 +237,6 @@ const fetchContainerInfo = async (appKey) => {
     const res = await axios.get('/api/containers/')
     const containers = res.data.data || []
     const container = containers.find(c => c.name.includes(appKey))
-    
     if (container) {
       containerInfo.value = {
         name: container.name,
@@ -279,38 +246,19 @@ const fetchContainerInfo = async (appKey) => {
         created: container.created,
         version: container.image?.split(':')[1] || '-'
       }
-    } else {
-      containerInfo.value = {}
-    }
-  } catch (err) {
-    console.error('获取容器详情失败:', err)
-  }
+    } else { containerInfo.value = {} }
+  } catch (err) { console.error('获取容器详情失败:', err) }
 }
 
 const fetchApps = async () => {
   try {
     const res = await axios.get('/api/apps/')
     apps.value = res.data.data || []
-    
-    const iconMap = {
-      'Monitor': '#e8f4f4', 'Coin': '#e8f4e8',
-      'Connection': '#f3e8f4', 'Document': '#fef3e8', 'Tools': '#e8e8f4'
-    }
-    const colorMap = {
-      'Monitor': '#477779', 'Coin': '#2e7d32',
-      'Connection': '#7b1fa2', 'Document': '#ed6c02', 'Tools': '#3f51b5'
-    }
-    apps.value = apps.value.map(app => ({
-      ...app,
-      iconBg: iconMap[app.icon] || '#e8f4f4',
-      iconColor: colorMap[app.icon] || '#477779'
-    }))
-    
+    const iconMap = { 'Monitor': '#e8f4f4', 'Coin': '#e8f4e8', 'Connection': '#f3e8f4', 'Document': '#fef3e8', 'Tools': '#e8e8f4' }
+    const colorMap = { 'Monitor': '#477779', 'Coin': '#2e7d32', 'Connection': '#7b1fa2', 'Document': '#ed6c02', 'Tools': '#3f51b5' }
+    apps.value = apps.value.map(app => ({ ...app, iconBg: iconMap[app.icon] || '#e8f4f4', iconColor: colorMap[app.icon] || '#477779' }))
     await fetchContainers()
-  } catch (err) {
-    console.error('获取应用列表失败:', err)
-    ElMessage.error('获取应用列表失败: ' + err.message)
-  }
+  } catch (err) { console.error('获取应用列表失败:', err); ElMessage.error('获取应用列表失败: ' + err.message) }
 }
 
 const openAppDetail = async (app) => {
@@ -321,118 +269,54 @@ const openAppDetail = async (app) => {
 
 const restartContainer = async () => {
   actionLoading.value = true
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('容器已重启')
-    await fetchContainerInfo(currentApp.value.key)
-  } catch (err) {
-    ElMessage.error('操作失败: ' + err.message)
-  } finally {
-    actionLoading.value = false
-  }
+  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已重启'); await fetchContainerInfo(currentApp.value.key) } 
+  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
+  finally { actionLoading.value = false }
 }
 
 const stopContainer = async () => {
   actionLoading.value = true
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('容器已停止')
-    await fetchContainerInfo(currentApp.value.key)
-  } catch (err) {
-    ElMessage.error('操作失败: ' + err.message)
-  } finally {
-    actionLoading.value = false
-  }
+  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已停止'); await fetchContainerInfo(currentApp.value.key) } 
+  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
+  finally { actionLoading.value = false }
 }
 
 const startContainer = async () => {
   actionLoading.value = true
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('容器已启动')
-    await fetchContainerInfo(currentApp.value.key)
-  } catch (err) {
-    ElMessage.error('操作失败: ' + err.message)
-  } finally {
-    actionLoading.value = false
-  }
+  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已启动'); await fetchContainerInfo(currentApp.value.key) } 
+  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
+  finally { actionLoading.value = false }
 }
 
 const openLogs = async () => {
-  containerLogs.value = `[${new Date().toLocaleString()}] 容器日志示例\n`
-  containerLogs.value += `容器名称: ${containerInfo.value.name}\n`
-  containerLogs.value += `状态: ${containerInfo.value.status}\n`
-  containerLogs.value += `镜像: ${containerInfo.value.image}\n`
-  containerLogs.value += `\n--- 日志输出 ---\n`
-  containerLogs.value += `[2024-01-01 00:00:00] Container started\n`
-  containerLogs.value += `[2024-01-01 00:00:01] Listening on port 80\n`
+  containerLogs.value = `[${new Date().toLocaleString()}] 容器日志示例\n容器名称: ${containerInfo.value.name}\n状态: ${containerInfo.value.status}\n镜像: ${containerInfo.value.image}\n\n--- 日志输出 ---\n[2024-01-01 00:00:00] Container started\n[2024-01-01 00:00:01] Listening on port 80\n`
   logDrawerVisible.value = true
 }
 
-const refreshLogs = () => {
-  ElMessage.success('日志已刷新')
-}
-
-const clearLogs = () => {
-  containerLogs.value = ''
-  ElMessage.success('日志已清空')
-}
-
-const openTerminal = () => {
-  ElMessage.info('终端功能开发中，将连接到容器')
-}
-
-const openFileDir = () => {
-  const dir = `/Users/machangsheng/Downloads/Upanel/apps/${currentApp.value.key}`
-  ElMessage.info(`打开目录: ${dir}`)
-}
+const refreshLogs = () => { ElMessage.success('日志已刷新') }
+const clearLogs = () => { containerLogs.value = ''; ElMessage.success('日志已清空') }
+const openTerminal = () => { ElMessage.info('终端功能开发中') }
+const openFileDir = () => { ElMessage.info(`打开目录: /Users/machangsheng/Downloads/Upanel/apps/${currentApp.value.key}`) }
 
 const uninstallApp = async () => {
-  await ElMessageBox.confirm(`确定卸载 ${currentApp.value.name} 吗？`, '警告', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-  
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('卸载成功')
-    detailDrawerVisible.value = false
-    await fetchApps()
-  } catch (err) {
-    ElMessage.error('卸载失败: ' + err.message)
-  }
+  await ElMessageBox.confirm(`确定卸载 ${currentApp.value.name} 吗？`, '警告', { type: 'warning' })
+  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('卸载成功'); detailDrawerVisible.value = false; await fetchApps() } 
+  catch (err) { ElMessage.error('卸载失败: ' + err.message) }
 }
 
-const availableVersions = computed(() => {
-  if (!selectedApp.value) return []
-  return selectedApp.value.versions || []
-})
-
+const availableVersions = computed(() => selectedApp.value ? selectedApp.value.versions || [] : [])
 const filteredApps = computed(() => {
   let result = apps.value
-  if (activeCategory.value !== 'all') {
-    result = result.filter(app => app.category === activeCategory.value)
-  }
-  if (activeStatus.value === 'installed') {
-    result = result.filter(app => app.installed)
-  } else if (activeStatus.value === 'not_installed') {
-    result = result.filter(app => !app.installed)
-  }
+  if (activeCategory.value !== 'all') result = result.filter(app => app.category === activeCategory.value)
+  if (activeStatus.value === 'installed') result = result.filter(app => app.installed)
+  else if (activeStatus.value === 'not_installed') result = result.filter(app => !app.installed)
   return result
 })
 
 const openInstallDrawer = (app) => {
-  if (app.installed) {
-    openAppDetail(app)
-    return
-  }
+  if (app.installed) { openAppDetail(app); return }
   selectedApp.value = app
-  installForm.value = {
-    name: `${app.key}-${app.default_version}`,
-    version: app.default_version,
-    config: { port: getDefaultPort(app.key) }
-  }
+  installForm.value = { name: `${app.key}-${app.default_version}`, version: app.default_version, config: { port: getDefaultPort(app.key) } }
   drawerVisible.value = true
 }
 
@@ -441,80 +325,29 @@ const getDefaultPort = (key) => {
   return ports[key] || 8080
 }
 
-const copyLogs = () => {
-  if (installLogs.value) {
-    navigator.clipboard.writeText(installLogs.value)
-    ElMessage.success('日志已复制到剪贴板')
-  }
-}
-
-const clearInstallLogs = () => {
-  installLogs.value = ''
-  ElMessage.success('日志已清空')
-}
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (logContainerRef.value) {
-      const preElement = logContainerRef.value.querySelector('pre')
-      if (preElement) {
-        preElement.scrollTop = preElement.scrollHeight
-      }
-    }
-  })
-}
+const copyLogs = () => { if (installLogs.value) { navigator.clipboard.writeText(installLogs.value); ElMessage.success('日志已复制') } }
+const clearInstallLogs = () => { installLogs.value = ''; ElMessage.success('日志已清空') }
+const scrollToBottom = () => { nextTick(() => { if (logContainerRef.value) { const pre = logContainerRef.value.querySelector('pre'); if (pre) pre.scrollTop = pre.scrollHeight } }) }
 
 const confirmInstall = async () => {
-  if (!installForm.value.version) {
-    ElMessage.warning('请选择版本')
-    return
-  }
+  if (!installForm.value.version) { ElMessage.warning('请选择版本'); return }
   
-  // 打开日志抽屉
   installLogs.value = ''
   installLogDrawerVisible.value = true
   installing.value = true
   
-  const steps = getInstallSteps(
-    selectedApp.value.name, 
-    installForm.value.version,
-    installForm.value.config.port
-  )
+  const steps = getInstallSteps(selectedApp.value.name, installForm.value.version, installForm.value.config.port)
   logStep = 0
-  
-  // 开始模拟日志输出
   logInterval = setInterval(() => {
-    if (logStep < steps.length) {
-      installLogs.value += steps[logStep] + '\n'
-      logStep++
-      scrollToBottom()
-    } else {
-      if (logInterval) clearInterval(logInterval)
-      logInterval = null
-    }
+    if (logStep < steps.length) { installLogs.value += steps[logStep] + '\n'; logStep++; scrollToBottom() }
+    else { if (logInterval) clearInterval(logInterval); logInterval = null }
   }, 300)
   
   try {
-    await axios.post('/api/apps/install', {
-      app_key: selectedApp.value.key,
-      version: installForm.value.version,
-      name: installForm.value.name,
-      config: installForm.value.config
-    })
-    
-    // 等待日志完成
+    await axios.post('/api/apps/install', { app_key: selectedApp.value.key, version: installForm.value.version, name: installForm.value.name, config: installForm.value.config })
     const waitForLogs = () => {
-      if (logStep >= steps.length) {
-        if (logInterval) clearInterval(logInterval)
-        logInterval = null
-        ElMessage.success('安装成功！')
-        drawerVisible.value = false
-        setTimeout(() => {
-          fetchApps()
-        }, 1000)
-      } else {
-        setTimeout(waitForLogs, 500)
-      }
+      if (logStep >= steps.length) { if (logInterval) clearInterval(logInterval); logInterval = null; ElMessage.success('安装成功！'); drawerVisible.value = false; setTimeout(() => fetchApps(), 1000) }
+      else { setTimeout(waitForLogs, 500) }
     }
     waitForLogs()
   } catch (err) {
@@ -523,21 +356,11 @@ const confirmInstall = async () => {
     installLogs.value += `\n[${new Date().toLocaleString()}] ❌ 安装失败: ${err.response?.data?.error || err.message}\n`
     scrollToBottom()
     ElMessage.error('安装失败: ' + (err.response?.data?.error || err.message))
-  } finally {
-    installing.value = false
-  }
+  } finally { installing.value = false }
 }
 
-onMounted(() => {
-  fetchApps()
-})
-
-onUnmounted(() => {
-  if (logInterval) {
-    clearInterval(logInterval)
-    logInterval = null
-  }
-})
+onMounted(() => { fetchApps() })
+onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 </script>
 
 <style scoped>
@@ -561,7 +384,11 @@ onUnmounted(() => {
 .drawer-content { padding: 0 4px; }
 .drawer-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
 
-/* 详情抽屉样式 */
+/* 统一按钮样式 */
+.el-button--small { height: 28px !important; line-height: 28px !important; padding: 0 12px !important; font-size: 12px !important; }
+.el-input__wrapper { height: 28px !important; padding: 0 8px !important; }
+.el-tabs__item { height: 32px !important; line-height: 32px !important; font-size: 13px !important; }
+
 .detail-content { padding: 0 4px; }
 .detail-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
 .detail-section:last-child { border-bottom: none; }
@@ -575,11 +402,9 @@ onUnmounted(() => {
 .status-label { color: #9ca3af; }
 .status-value { color: #1f2937; font-weight: 500; }
 .action-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.container-inspect { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; }
 
-/* 日志样式 */
 .logs-content { height: 100%; display: flex; flex-direction: column; gap: 12px; }
 .log-controls { display: flex; gap: 8px; }
 .log-container { flex: 1; overflow-y: auto; }
-.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; margin: 0; min-height: 300px; }
+.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 0; min-height: 300px; }
 </style>

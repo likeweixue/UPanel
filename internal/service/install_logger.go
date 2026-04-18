@@ -1,17 +1,15 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"io"
-	"os/exec"
 	"sync"
+	"time"
 )
 
 type InstallLogger struct {
-	mu      sync.RWMutex
-	logs    map[string]*bytes.Buffer
+	mu   sync.RWMutex
+	logs map[string]*bytes.Buffer
 }
 
 var installLogger = &InstallLogger{

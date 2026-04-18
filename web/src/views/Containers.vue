@@ -51,7 +51,7 @@
 
     <!-- 容器列表 -->
     <div class="content-panel" v-if="activeTab === 'containers'">
-      <el-table :data="filteredContainers" stripe style="width: 100%" @selection-change="handleSelectionChange">
+      <el-table :data="filteredContainers" style="width: 100%" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
@@ -104,7 +104,7 @@
           <el-icon><Refresh /></el-icon> 刷新
         </el-button>
       </div>
-      <el-table :data="filteredImages" stripe style="width: 100%">
+      <el-table :data="filteredImages" style="width: 100%">
         <el-table-column prop="repository" label="仓库" min-width="200" />
         <el-table-column prop="tag" label="标签" width="120" />
         <el-table-column prop="size" label="大小" width="100" />
@@ -120,7 +120,7 @@
 
     <!-- 数据卷列表 -->
     <div class="content-panel" v-if="activeTab === 'volumes'">
-      <el-table :data="volumes" stripe style="width: 100%">
+      <el-table :data="volumes" style="width: 100%">
         <el-table-column prop="name" label="名称" min-width="200" />
         <el-table-column prop="driver" label="驱动" width="120" />
         <el-table-column prop="mountpoint" label="挂载点" min-width="250" />
@@ -135,7 +135,7 @@
 
     <!-- 网络列表 -->
     <div class="content-panel" v-if="activeTab === 'networks'">
-      <el-table :data="networks" stripe style="width: 100%">
+      <el-table :data="networks" style="width: 100%">
         <el-table-column prop="name" label="名称" min-width="200" />
         <el-table-column prop="driver" label="驱动" width="120" />
         <el-table-column prop="subnet" label="子网" width="180" />
@@ -158,7 +158,7 @@
           <el-icon><Refresh /></el-icon> 刷新
         </el-button>
       </div>
-      <el-table :data="composeProjects" stripe style="width: 100%">
+      <el-table :data="composeProjects" style="width: 100%">
         <el-table-column prop="name" label="项目名称" min-width="200" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -649,5 +649,22 @@ const refreshAll = () => {
   font-family: monospace;
   font-size: 12px;
   overflow-x: auto;
+}
+</style>
+<style>
+.top-panel .el-button {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+}
+.top-panel .el-input__wrapper {
+  height: 28px !important;
+  padding: 0 8px !important;
+}
+.top-panel .el-tabs__item {
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
 }
 </style>
