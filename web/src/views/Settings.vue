@@ -11,12 +11,27 @@
       </div>
       <div class="top-right">
         <el-tabs v-model="activeTab" class="settings-tabs">
-          <el-tab-pane name="profile"><template #label><span><el-icon><User /></el-icon> 个人设置</span></template></el-tab-pane>
-          <el-tab-pane name="system"><template #label><span><el-icon><Setting /></el-icon> 系统设置</span></template></el-tab-pane>
-          <el-tab-pane name="security"><template #label><span><el-icon><Lock /></el-icon> 安全设置</span></template></el-tab-pane>
-          <el-tab-pane name="network"><template #label><span><el-icon><Connection /></el-icon> 网络设置</span></template></el-tab-pane>
-          <el-tab-pane name="backup"><template #label><span><el-icon><FolderOpened /></el-icon> 备份还原</span></template></el-tab-pane>
-          <el-tab-pane name="about"><template #label><span><el-icon><InfoFilled /></el-icon> 关于</span></template></el-tab-pane>
+          <el-tab-pane name="profile">
+            <template #label><span><el-icon><User /></el-icon> 个人设置</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="system">
+            <template #label><span><el-icon><Setting /></el-icon> 系统设置</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="docker">
+            <template #label><span><el-icon><Box /></el-icon> Docker设置</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="security">
+            <template #label><span><el-icon><Lock /></el-icon> 安全设置</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="network">
+            <template #label><span><el-icon><Connection /></el-icon> 网络设置</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="backup">
+            <template #label><span><el-icon><FolderOpened /></el-icon> 备份还原</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="about">
+            <template #label><span><el-icon><InfoFilled /></el-icon> 关于</span></template>
+          </el-tab-pane>
         </el-tabs>
       </div>
     </div>
@@ -61,13 +76,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="全局透明度">
-            <el-slider 
-              v-model="uiSettings.opacity" 
-              :min="0" 
-              :max="100" 
-              :format-tooltip="formatOpacity" 
-              @change="changeOpacity" 
-            />
+            <el-slider v-model="uiSettings.opacity" :min="0" :max="100" :format-tooltip="formatOpacity" @change="changeOpacity" />
             <div class="form-tip">调整面板整体透明度，数值越大越不透明（100%为完全不透明）</div>
           </el-form-item>
         </el-form>
@@ -77,27 +86,7 @@
         <h3 class="section-title">全局 CSS</h3>
         <el-form label-width="120px" class="settings-form">
           <el-form-item label="自定义样式">
-            <el-input 
-              v-model="uiSettings.customCSS" 
-              type="textarea" 
-              :rows="12"
-              placeholder="/* 自定义 CSS 样式 */
-/* 例如：修改主题色 */
-:root {
-  --theme-primary: #ff6600;
-}
-
-/* 修改背景色 */
-.app-container {
-  background-color: #f0f0f0;
-}
-
-/* 修改卡片样式 */
-.el-card {
-  background-color: #ffffff;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-}"
-            />
+            <el-input v-model="uiSettings.customCSS" type="textarea" :rows="12" placeholder="/* 自定义 CSS 样式 */" />
             <div class="form-tip">在这里编写自定义 CSS 样式，会实时生效</div>
           </el-form-item>
           <el-form-item>
@@ -115,9 +104,13 @@
         <el-form :model="systemForm" label-width="150px" class="settings-form">
           <el-form-item label="面板名称"><el-input v-model="systemForm.panelName" /></el-form-item>
           <el-form-item label="面板端口"><el-input-number v-model="systemForm.port" :min="1" :max="65535" /></el-form-item>
-          <el-form-item label="网站根目录"><el-input v-model="systemForm.websitePath" /></el-form-item>
         </el-form>
       </div>
+    </div>
+
+    <!-- Docker 设置 -->
+    <div class="content-panel" v-if="activeTab === 'docker'">
+      <DockerConfig />
     </div>
 
     <!-- 安全设置 -->
@@ -127,7 +120,6 @@
         <el-form label-width="150px" class="settings-form">
           <el-form-item label="登录失败限制"><el-switch v-model="securityForm.loginLimit" /></el-form-item>
           <el-form-item label="最大失败次数" v-if="securityForm.loginLimit"><el-input-number v-model="securityForm.maxAttempts" :min="1" :max="20" /></el-form-item>
-          <el-form-item label="锁定时长" v-if="securityForm.loginLimit"><el-input-number v-model="securityForm.lockMinutes" :min="1" :max="60" /></el-form-item>
         </el-form>
       </div>
     </div>
@@ -138,7 +130,6 @@
         <h3 class="section-title">代理设置</h3>
         <el-form label-width="120px" class="settings-form">
           <el-form-item label="HTTP 代理"><el-input v-model="networkForm.httpProxy" placeholder="http://127.0.0.1:7890" /></el-form-item>
-          <el-form-item label="HTTPS 代理"><el-input v-model="networkForm.httpsProxy" placeholder="http://127.0.0.1:7890" /></el-form-item>
         </el-form>
       </div>
     </div>
@@ -168,8 +159,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Refresh, User, Setting, Lock, Connection, FolderOpened, InfoFilled } from '@element-plus/icons-vue'
+import { Check, Refresh, User, Setting, Lock, Connection, FolderOpened, InfoFilled, Box } from '@element-plus/icons-vue'
 import { applyTheme } from '@/themes'
+import DockerConfig from './settings/DockerConfig.vue'
 
 const activeTab = ref('profile')
 const saving = ref(false)
@@ -181,9 +173,9 @@ const passwordFormRef = ref(null)
 const profileForm = reactive({ username: 'admin', email: '', phone: '' })
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const uiSettings = reactive({ theme: 'light', language: 'zh-CN', customCSS: '', opacity: 85 })
-const systemForm = reactive({ panelName: 'UPanel', port: 8080, websitePath: '/www/wwwroot' })
-const securityForm = reactive({ loginLimit: true, maxAttempts: 5, lockMinutes: 15 })
-const networkForm = reactive({ httpProxy: '', httpsProxy: '' })
+const systemForm = reactive({ panelName: 'UPanel', port: 8080 })
+const securityForm = reactive({ loginLimit: true, maxAttempts: 5 })
+const networkForm = reactive({ httpProxy: '' })
 
 const passwordRules = {
   oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
@@ -191,86 +183,43 @@ const passwordRules = {
   confirmPassword: [{ required: true, message: '请确认新密码', trigger: 'blur' }]
 }
 
-// 格式化透明度显示
 const formatOpacity = (value) => `${value}%`
 
-// 应用透明度
 const applyOpacity = (opacity) => {
   const value = opacity / 100
   const oldStyle = document.getElementById('opacity-style')
-  if (oldStyle) {
-    oldStyle.remove()
-  }
+  if (oldStyle) oldStyle.remove()
   
   const style = document.createElement('style')
   style.id = 'opacity-style'
   style.textContent = `
-    /* 全局透明度控制 */
-    .el-card,
-    .stats-panel,
-    .gauges-panel,
-    .chart-panel,
-    .info-panel,
-    .notification-panel,
-    .apps-panel,
-    .files-panel,
-    .websites-panel,
-    .databases-panel,
-    .containers-panel,
-    .content-panel,
-    .categories-panel,
-    .top-panel,
-    .breadcrumb-panel,
-    .process-card,
-    .chart-card,
-    .settings-section,
-    .el-table__body tr,
-    .app-card,
-    .website-card {
+    .el-card, .stats-panel, .gauges-panel, .chart-panel, .info-panel, .notification-panel,
+    .apps-panel, .files-panel, .websites-panel, .databases-panel, .containers-panel,
+    .content-panel, .categories-panel, .top-panel, .breadcrumb-panel,
+    .process-card, .chart-card, .settings-section, .el-table__body tr,
+    .app-card, .website-card {
       background-color: rgba(255, 255, 255, ${value}) !important;
     }
-    
-    body.dark-mode .el-card,
-    body.dark-mode .stats-panel,
-    body.dark-mode .gauges-panel,
-    body.dark-mode .chart-panel,
-    body.dark-mode .info-panel,
-    body.dark-mode .notification-panel,
-    body.dark-mode .apps-panel,
-    body.dark-mode .files-panel,
-    body.dark-mode .websites-panel,
-    body.dark-mode .databases-panel,
-    body.dark-mode .containers-panel,
-    body.dark-mode .content-panel,
-    body.dark-mode .categories-panel,
-    body.dark-mode .top-panel,
-    body.dark-mode .breadcrumb-panel {
+    body.dark-mode .el-card, body.dark-mode .stats-panel, body.dark-mode .gauges-panel,
+    body.dark-mode .chart-panel, body.dark-mode .info-panel, body.dark-mode .notification-panel,
+    body.dark-mode .apps-panel, body.dark-mode .files-panel, body.dark-mode .websites-panel,
+    body.dark-mode .databases-panel, body.dark-mode .containers-panel,
+    body.dark-mode .content-panel, body.dark-mode .categories-panel,
+    body.dark-mode .top-panel, body.dark-mode .breadcrumb-panel {
       background-color: rgba(30, 30, 30, ${value}) !important;
     }
-    
-    body.dark-mode .el-table__body tr {
-      background-color: rgba(30, 30, 30, ${value}) !important;
-    }
-    
-    .sidebar {
-      background-color: rgba(255, 255, 255, ${Math.min(value + 0.05, 1)}) !important;
-    }
-    
-    body.dark-mode .sidebar {
-      background-color: rgba(30, 30, 30, ${Math.min(value + 0.05, 1)}) !important;
-    }
+    .sidebar { background-color: rgba(255, 255, 255, ${Math.min(value + 0.05, 1)}) !important; }
+    body.dark-mode .sidebar { background-color: rgba(30, 30, 30, ${Math.min(value + 0.05, 1)}) !important; }
   `
   document.head.appendChild(style)
   localStorage.setItem('panelOpacity', opacity)
 }
 
-// 透明度变化
 const changeOpacity = (value) => {
   applyOpacity(value)
   ElMessage.success(`透明度已调整为 ${value}%`)
 }
 
-// 加载保存的透明度
 const loadOpacity = () => {
   const saved = localStorage.getItem('panelOpacity')
   if (saved) {
@@ -279,7 +228,6 @@ const loadOpacity = () => {
   }
 }
 
-// 加载保存的自定义 CSS
 const loadCustomCSS = () => {
   const saved = localStorage.getItem('customCSS')
   if (saved) {
@@ -288,15 +236,11 @@ const loadCustomCSS = () => {
   }
 }
 
-// 应用自定义 CSS
 const applyCustomCSS = async (silent = false) => {
   applyingCSS.value = true
   try {
     const oldStyle = document.getElementById('custom-css-style')
-    if (oldStyle) {
-      oldStyle.remove()
-    }
-    
+    if (oldStyle) oldStyle.remove()
     if (uiSettings.customCSS && uiSettings.customCSS.trim()) {
       const style = document.createElement('style')
       style.id = 'custom-css-style'
@@ -306,10 +250,7 @@ const applyCustomCSS = async (silent = false) => {
     } else {
       localStorage.removeItem('customCSS')
     }
-    
-    if (!silent) {
-      ElMessage.success('自定义样式已应用')
-    }
+    if (!silent) ElMessage.success('自定义样式已应用')
   } catch (err) {
     ElMessage.error('应用样式失败: ' + err.message)
   } finally {
@@ -317,13 +258,10 @@ const applyCustomCSS = async (silent = false) => {
   }
 }
 
-// 重置自定义 CSS
 const resetCustomCSS = () => {
   uiSettings.customCSS = ''
   const oldStyle = document.getElementById('custom-css-style')
-  if (oldStyle) {
-    oldStyle.remove()
-  }
+  if (oldStyle) oldStyle.remove()
   localStorage.removeItem('customCSS')
   ElMessage.success('已重置为默认样式')
 }
@@ -388,9 +326,5 @@ onMounted(() => {
 .about-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 32px; }
 .about-links a { color: #477779; text-decoration: none; }
 .about-copyright { font-size: 12px; color: #9ca3af; }
-
-/* 滑块样式 */
-.el-slider {
-  width: 300px;
-}
+.el-slider { width: 300px; }
 </style>

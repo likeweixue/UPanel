@@ -1,129 +1,160 @@
 <template>
   <div class="apps-container">
-    <!-- 顶部分类面板 -->
+    <!-- 分类面板 -->
     <div class="categories-panel">
       <div class="categories-wrapper">
         <div class="categories-left">
           <div class="category-group">
-            <span 
-              v-for="cat in leftCategories" 
-              :key="cat.key"
-              class="category-item"
-              :class="{ active: activeCategory === cat.key }"
-              @click="activeCategory = cat.key"
-            >
+            <span v-for="cat in leftCategories" :key="cat.key" class="category-item"
+              :class="{ active: activeCategory === cat.key }" @click="activeCategory = cat.key">
               {{ cat.name }}
             </span>
           </div>
           <div class="category-divider"></div>
           <div class="category-group">
-            <span 
-              v-for="cat in rightCategories" 
-              :key="cat.key"
-              class="category-item"
-              :class="{ active: activeStatus === cat.key }"
-              @click="activeStatus = cat.key"
-            >
+            <span v-for="cat in rightCategories" :key="cat.key" class="category-item"
+              :class="{ active: activeStatus === cat.key }" @click="activeStatus = cat.key">
               {{ cat.name }}
             </span>
           </div>
           <div class="category-divider"></div>
           <div class="category-group">
-            <span 
-              class="category-item"
-              :class="{ active: activeStatus === 'updatable' }"
-              @click="activeStatus = 'updatable'"
-            >
+            <span class="category-item" :class="{ active: activeStatus === 'updatable' }" @click="activeStatus = 'updatable'">
               可更新
               <span v-if="updatableCount > 0" class="update-badge">{{ updatableCount }}</span>
             </span>
           </div>
         </div>
         <div class="categories-right">
-          <el-input 
-            v-model="searchKeyword" 
-            placeholder="搜索应用" 
-            prefix-icon="Search"
-            clearable
-            size="small"
-            style="width: 220px"
-          />
+          <el-input v-model="searchKeyword" placeholder="搜索应用" prefix-icon="Search" clearable size="small" style="width: 220px" />
         </div>
       </div>
     </div>
 
-    <!-- 下方应用列表面板 -->
+    <!-- 应用列表 -->
     <div class="apps-panel">
       <div class="apps-grid">
-        <div 
-          v-for="app in filteredApps" 
-          :key="app.id"
-          class="app-card"
-          @click="openAppDetail(app)"
-        >
+        <div v-for="app in filteredApps" :key="app.id" class="app-card" @click="openAppDetail(app)">
           <div class="app-icon" :style="{ backgroundColor: app.iconBg }">
             <el-icon :size="32" :color="app.iconColor">
               <component :is="app.icon" />
             </el-icon>
           </div>
-          
           <div class="app-info">
             <div class="app-name">{{ app.name }}</div>
             <div class="app-description">{{ app.description }}</div>
             <div class="app-footer">
-              <el-button 
-                size="small" 
-                :type="app.installed ? 'info' : 'primary'"
-                :disabled="app.installed"
-                @click.stop="openInstallDrawer(app)"
-              >
-                {{ app.installed ? `已安装` : '安装' }}
-              </el-button>
-              <el-button 
-                v-if="app.hasUpdate"
-                size="small" 
-                type="warning"
-                @click.stop="updateApp(app)"
-              >
-                更新
-              </el-button>
+              <el-button size="small" type="primary" @click.stop="openInstallDrawer(app)">安装</el-button>
+              <el-button v-if="app.hasUpdate" size="small" type="warning" @click.stop="updateApp(app)">更新</el-button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 安装抽屉 -->
-    <el-drawer
-      v-model="drawerVisible"
-      :title="`安装 ${selectedApp?.name}`"
-      direction="rtl"
-      size="450px"
-    >
+    <!-- 安装抽屉 - 完整版 -->
+    <el-drawer v-model="drawerVisible" :title="`安装 ${selectedApp?.name}`" direction="rtl" size="550px">
       <div class="drawer-content">
-        <el-form :model="installForm" label-width="100px" label-position="left">
-          <el-form-item label="应用名称">
-            <el-input v-model="installForm.name" :placeholder="`例如: ${selectedApp?.name}-test`" />
-          </el-form-item>
-          <el-form-item label="版本" v-if="availableVersions.length">
-            <el-select v-model="installForm.version">
-              <el-option v-for="v in availableVersions" :key="v" :label="v" :value="v" />
-            </el-select>
-          </el-form-item>
-          <template v-if="selectedApp?.key === 'nginx' || selectedApp?.key === 'openresty' || selectedApp?.key === 'wordpress'">
-            <el-form-item label="端口">
-              <el-input-number v-model="installForm.config.port" :min="80" :max="8099" />
+        <el-form :model="installForm" label-width="120px" label-position="left">
+          <!-- 基础配置 -->
+          <div class="config-section">
+            <div class="section-title">基础配置</div>
+            
+            <el-form-item label="容器名称">
+              <el-input v-model="installForm.name" :placeholder="`默认: ${selectedApp?.key}-${installForm.version}`" />
+              <div class="form-tip">用于区分多个实例，留空则使用默认名称</div>
             </el-form-item>
-          </template>
-          <template v-if="selectedApp?.key === 'mysql'">
-            <el-form-item label="端口">
-              <el-input-number v-model="installForm.config.port" :min="3306" :max="3399" />
+
+            <el-form-item label="版本" v-if="availableVersions.length">
+              <el-select v-model="installForm.version">
+                <el-option v-for="v in availableVersions" :key="v" :label="v" :value="v" />
+              </el-select>
             </el-form-item>
-            <el-form-item label="root密码">
-              <el-input v-model="installForm.config.password" type="password" placeholder="留空则自动生成" />
+          </div>
+
+          <!-- 网络配置 -->
+          <div class="config-section" v-if="showPortConfig">
+            <div class="section-title">网络配置</div>
+            
+            <el-form-item label="端口映射">
+              <el-input-number v-model="installForm.config.port" :min="1" :max="65535" />
+              <div class="form-tip">将宿主机端口映射到容器 {{ getContainerPort() }} 端口</div>
             </el-form-item>
-          </template>
+
+            <el-form-item label="允许外部访问">
+              <el-switch v-model="installForm.externalAccess" />
+              <div class="form-tip">开启后允许外部网络访问</div>
+            </el-form-item>
+          </div>
+
+          <!-- 资源限制 -->
+          <div class="config-section">
+            <div class="section-title">资源限制</div>
+            
+            <el-form-item label="CPU 限制">
+              <el-input-number v-model="installForm.cpuLimit" :min="0" :step="0.5" :precision="1" />
+              <span class="unit">核心</span>
+              <div class="form-tip">0 表示不限制</div>
+            </el-form-item>
+
+            <el-form-item label="内存限制">
+              <el-input-number v-model="installForm.memoryLimit" :min="0" :step="128" />
+              <span class="unit">MB</span>
+              <div class="form-tip">0 表示不限制</div>
+            </el-form-item>
+          </div>
+
+          <!-- 重启策略 -->
+          <div class="config-section">
+            <div class="section-title">重启策略</div>
+            
+            <el-form-item label="重启策略">
+              <el-radio-group v-model="installForm.restartPolicy">
+                <el-radio value="no">不重启</el-radio>
+                <el-radio value="always">总是重启</el-radio>
+                <el-radio value="on-failure">失败时重启</el-radio>
+              </el-radio-group>
+            </el-form-item>
+
+            <el-form-item label="最大重启次数" v-if="installForm.restartPolicy === 'on-failure'">
+              <el-input-number v-model="installForm.maxRetries" :min="1" :max="10" />
+            </el-form-item>
+          </div>
+
+          <!-- 应用特定配置 -->
+          <div class="config-section" v-if="showAppSpecificConfig">
+            <div class="section-title">应用配置</div>
+
+            <template v-if="selectedApp?.key === 'mysql'">
+              <el-form-item label="root密码">
+                <el-input v-model="installForm.config.password" type="password" placeholder="留空则自动生成" />
+              </el-form-item>
+            </template>
+
+            <template v-if="selectedApp?.key === 'php'">
+              <el-form-item label="PHP扩展">
+                <el-select v-model="installForm.extensions" multiple filterable placeholder="请选择需要的扩展">
+                  <el-option label="MySQL" value="mysql" />
+                  <el-option label="PostgreSQL" value="pgsql" />
+                  <el-option label="Redis" value="redis" />
+                  <el-option label="GD" value="gd" />
+                  <el-option label="cURL" value="curl" />
+                  <el-option label="Zip" value="zip" />
+                  <el-option label="MBString" value="mbstring" />
+                  <el-option label="XML" value="xml" />
+                  <el-option label="JSON" value="json" />
+                  <el-option label="BCMath" value="bcmath" />
+                  <el-option label="OPcache" value="opcache" />
+                  <el-option label="Sockets" value="sockets" />
+                  <el-option label="SOAP" value="soap" />
+                  <el-option label="Intl" value="intl" />
+                </el-select>
+                <div class="form-tip">按住 Ctrl 键多选</div>
+              </el-form-item>
+            </template>
+          </div>
         </el-form>
+
         <div class="drawer-footer">
           <el-button @click="drawerVisible = false">取消</el-button>
           <el-button type="primary" @click="confirmInstall" :loading="installing">确认安装</el-button>
@@ -132,12 +163,7 @@
     </el-drawer>
 
     <!-- 应用详情抽屉 -->
-    <el-drawer
-      v-model="detailDrawerVisible"
-      :title="currentApp?.name"
-      direction="rtl"
-      size="500px"
-    >
+    <el-drawer v-model="detailDrawerVisible" :title="currentApp?.name" direction="rtl" size="500px">
       <div class="detail-content">
         <div class="detail-section">
           <div class="detail-header">
@@ -174,21 +200,16 @@
             <span class="status-label">端口映射</span>
             <span class="status-value">{{ containerInfo?.ports || '-' }}</span>
           </div>
-          <div class="status-row">
-            <span class="status-label">创建时间</span>
-            <span class="status-value">{{ containerInfo?.created || '-' }}</span>
-          </div>
         </div>
 
         <div class="detail-section">
           <div class="section-title">操作</div>
           <div class="action-buttons">
-            <el-button size="small" @click="restartContainer" :loading="actionLoading">重启</el-button>
-            <el-button size="small" @click="stopContainer" :loading="actionLoading" v-if="containerInfo?.status === 'running'">停止</el-button>
-            <el-button size="small" @click="startContainer" :loading="actionLoading" v-else>启动</el-button>
+            <el-button size="small" type="success" @click="openAppUrl">访问</el-button>
+            <el-button size="small" @click="restartContainer">重启</el-button>
+            <el-button size="small" @click="stopContainer" v-if="containerInfo?.status === 'running'">停止</el-button>
+            <el-button size="small" @click="startContainer" v-else>启动</el-button>
             <el-button size="small" @click="openLogs">日志</el-button>
-            <el-button size="small" @click="openTerminal">终端</el-button>
-            <el-button size="small" @click="openFileDir">文件</el-button>
             <el-button size="small" type="danger" @click="uninstallApp">卸载</el-button>
           </div>
         </div>
@@ -196,70 +217,37 @@
     </el-drawer>
 
     <!-- 安装日志抽屉 -->
-    <el-drawer
-      v-model="installLogDrawerVisible"
-      title="安装日志"
-      direction="rtl"
-      size="700px"
-      :close-on-click-modal="false"
-    >
+    <el-drawer v-model="installLogDrawerVisible" title="安装日志" direction="rtl" size="700px">
       <div class="logs-content">
         <div class="log-controls">
-          <el-button size="small" @click="copyLogs" :disabled="!installLogs">复制日志</el-button>
-          <el-button size="small" @click="clearInstallLogs" :disabled="!installLogs">清空</el-button>
+          <el-button size="small" @click="copyLogs">复制日志</el-button>
+          <el-button size="small" @click="clearInstallLogs">清空</el-button>
         </div>
-        <div class="log-container" ref="logContainerRef">
-          <pre class="log-pre">{{ installLogs || '等待安装开始...' }}</pre>
-        </div>
-      </div>
-    </el-drawer>
-
-    <!-- 容器日志抽屉 -->
-    <el-drawer
-      v-model="logDrawerVisible"
-      title="容器日志"
-      direction="rtl"
-      size="600px"
-    >
-      <div class="logs-content">
-        <div class="log-controls">
-          <el-button size="small" @click="refreshLogs">刷新</el-button>
-          <el-button size="small" @click="clearLogs">清空</el-button>
-        </div>
-        <pre class="log-pre">{{ containerLogs }}</pre>
+        <pre class="log-pre">{{ installLogs || '等待安装开始...' }}</pre>
       </div>
     </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import { Link } from '@element-plus/icons-vue'
 
 const activeCategory = ref('all')
 const activeStatus = ref('all')
 const searchKeyword = ref('')
 const drawerVisible = ref(false)
 const detailDrawerVisible = ref(false)
-const logDrawerVisible = ref(false)
 const installLogDrawerVisible = ref(false)
 const installing = ref(false)
-const actionLoading = ref(false)
 const selectedApp = ref(null)
 const currentApp = ref(null)
 const containerInfo = ref({})
-const containerLogs = ref('')
 const installLogs = ref('')
 let logInterval = null
 let logStep = 0
-const logContainerRef = ref(null)
-
-const installForm = ref({
-  name: '',
-  version: '',
-  config: { port: 8080 }
-})
 
 const leftCategories = [
   { key: 'all', name: '全部' },
@@ -278,9 +266,34 @@ const rightCategories = [
 
 const apps = ref([])
 
-// 可更新数量
-const updatableCount = computed(() => {
-  return apps.value.filter(app => app.hasUpdate).length
+// 安装表单
+const installForm = ref({
+  name: '',
+  version: '',
+  externalAccess: false,
+  cpuLimit: 0,
+  memoryLimit: 0,
+  restartPolicy: 'no',
+  maxRetries: 5,
+  config: { port: 8080, password: '' },
+  extensions: ['mysql', 'gd', 'curl', 'zip']
+})
+
+// 辅助函数
+const getContainerPort = () => {
+  const appKey = selectedApp.value?.key
+  const ports = { nginx: 80, openresty: 80, wordpress: 80, mysql: 3306, postgresql: 5432, redis: 6379 }
+  return ports[appKey] || 80
+}
+
+const showPortConfig = computed(() => {
+  const appKey = selectedApp.value?.key
+  return ['nginx', 'openresty', 'wordpress', 'mysql', 'postgresql', 'redis'].includes(appKey)
+})
+
+const showAppSpecificConfig = computed(() => {
+  const appKey = selectedApp.value?.key
+  return ['mysql', 'php'].includes(appKey)
 })
 
 const getInstallSteps = (appName, version, port) => {
@@ -288,23 +301,11 @@ const getInstallSteps = (appName, version, port) => {
   const timeStr = now.toLocaleString()
   return [
     `[${timeStr}] 🚀 开始安装应用 [${appName}]`,
-    `[${timeStr}] 📦 准备安装包...`,
-    `[${timeStr}] 🔍 检查依赖环境...`,
-    `[${timeStr}] ✅ 依赖检查通过`,
-    `[${timeStr}] 🐳 开始拉取镜像...`,
     `[${timeStr}] 📥 拉取镜像: ${appName}:${version}`,
-    `[${timeStr}] ⏳ 下载中... 0%`,
-    `[${timeStr}] ⏳ 下载中... 25%`,
-    `[${timeStr}] ⏳ 下载中... 50%`,
-    `[${timeStr}] ⏳ 下载中... 75%`,
-    `[${timeStr}] ⏳ 下载中... 100%`,
     `[${timeStr}] ✅ 镜像拉取成功`,
-    `[${timeStr}] 🐳 创建容器...`,
     port ? `[${timeStr}] 🔌 端口映射: ${port}:80` : '',
     `[${timeStr}] 🚀 启动容器...`,
     `[${timeStr}] ✅ 容器启动成功`,
-    `[${timeStr}] 🔄 执行初始化脚本...`,
-    `[${timeStr}] ✅ 初始化完成`,
     `[${timeStr}] 🎉 应用 [${appName}] 安装完成！`
   ].filter(step => step)
 }
@@ -314,12 +315,11 @@ const fetchContainers = async () => {
     const res = await axios.get('/api/containers/')
     const containers = res.data.data || []
     const containerNames = containers.map(c => c.name)
-    apps.value = apps.value.map(app => {
-      const isInstalled = containerNames.some(name => name.includes(app.key))
-      // 模拟可更新状态（实际应该从后端获取）
-      const hasUpdate = isInstalled && Math.random() > 0.7
-      return { ...app, installed: isInstalled, hasUpdate }
-    })
+    apps.value = apps.value.map(app => ({
+      ...app,
+      installed: containerNames.some(name => name.includes(app.key)),
+      hasUpdate: false
+    }))
   } catch (err) { console.error('获取容器列表失败:', err) }
 }
 
@@ -345,6 +345,15 @@ const fetchApps = async () => {
   try {
     const res = await axios.get('/api/apps/')
     apps.value = res.data.data || []
+    // 添加开发环境应用
+    const devApps = [
+      { id: "11", key: "golang", name: "Go", category: "environment", description: "Google 开发的静态强类型编程语言", icon: "Document", versions: ["1.23"], default_version: "1.23" },
+      { id: "12", key: "nodejs", name: "Node.js", category: "environment", description: "基于 Chrome V8 的 JavaScript 运行时", icon: "Document", versions: ["20"], default_version: "20" },
+      { id: "13", key: "python", name: "Python", category: "environment", description: "强大的通用编程语言", icon: "Document", versions: ["3.12"], default_version: "3.12" },
+      { id: "14", key: "java", name: "Java", category: "environment", description: "企业级应用开发平台", icon: "Document", versions: ["17"], default_version: "17" }
+    ]
+    apps.value = [...apps.value, ...devApps]
+    
     const iconMap = { 'Monitor': '#e8f4f4', 'Coin': '#e8f4e8', 'Connection': '#f3e8f4', 'Document': '#fef3e8', 'Tools': '#e8e8f4' }
     const colorMap = { 'Monitor': '#477779', 'Coin': '#2e7d32', 'Connection': '#7b1fa2', 'Document': '#ed6c02', 'Tools': '#3f51b5' }
     apps.value = apps.value.map(app => ({ ...app, iconBg: iconMap[app.icon] || '#e8f4f4', iconColor: colorMap[app.icon] || '#477779' }))
@@ -358,76 +367,77 @@ const openAppDetail = async (app) => {
   detailDrawerVisible.value = true
 }
 
+const openAppUrl = () => {
+  if (!currentApp.value) return
+  const portMatch = containerInfo.value?.ports?.match(/\d+/)
+  const port = portMatch ? portMatch[0] : ''
+  window.open(`http://localhost:${port || 8080}`, '_blank')
+}
+
 const restartContainer = async () => {
-  actionLoading.value = true
-  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已重启'); await fetchContainerInfo(currentApp.value.key) } 
-  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
-  finally { actionLoading.value = false }
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  ElMessage.success('容器已重启')
+  await fetchContainerInfo(currentApp.value.key)
 }
 
 const stopContainer = async () => {
-  actionLoading.value = true
-  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已停止'); await fetchContainerInfo(currentApp.value.key) } 
-  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
-  finally { actionLoading.value = false }
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  ElMessage.success('容器已停止')
+  await fetchContainerInfo(currentApp.value.key)
 }
 
 const startContainer = async () => {
-  actionLoading.value = true
-  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('容器已启动'); await fetchContainerInfo(currentApp.value.key) } 
-  catch (err) { ElMessage.error('操作失败: ' + err.message) } 
-  finally { actionLoading.value = false }
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  ElMessage.success('容器已启动')
+  await fetchContainerInfo(currentApp.value.key)
 }
 
 const openLogs = async () => {
-  containerLogs.value = `[${new Date().toLocaleString()}] 容器日志示例\n容器名称: ${containerInfo.value.name}\n状态: ${containerInfo.value.status}\n镜像: ${containerInfo.value.image}\n\n--- 日志输出 ---\n[2024-01-01 00:00:00] Container started\n[2024-01-01 00:00:01] Listening on port 80\n`
-  logDrawerVisible.value = true
+  ElMessage.info('日志功能开发中')
 }
-
-const refreshLogs = () => { ElMessage.success('日志已刷新') }
-const clearLogs = () => { containerLogs.value = ''; ElMessage.success('日志已清空') }
-const openTerminal = () => { ElMessage.info('终端功能开发中') }
-const openFileDir = () => { ElMessage.info(`打开目录: /Users/machangsheng/Downloads/Upanel/apps/${currentApp.value.key}`) }
 
 const uninstallApp = async () => {
   await ElMessageBox.confirm(`确定卸载 ${currentApp.value.name} 吗？`, '警告', { type: 'warning' })
-  try { await new Promise(resolve => setTimeout(resolve, 1000)); ElMessage.success('卸载成功'); detailDrawerVisible.value = false; await fetchApps() } 
-  catch (err) { ElMessage.error('卸载失败: ' + err.message) }
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  ElMessage.success('卸载成功')
+  detailDrawerVisible.value = false
+  await fetchApps()
 }
 
-const updateApp = (app) => {
-  ElMessage.info(`更新 ${app.name} 功能开发中`)
-}
+const updateApp = (app) => { ElMessage.info(`更新 ${app.name} 功能开发中`) }
 
 const availableVersions = computed(() => selectedApp.value ? selectedApp.value.versions || [] : [])
+const updatableCount = computed(() => apps.value.filter(app => app.hasUpdate).length)
+
 const filteredApps = computed(() => {
   let result = apps.value
-  // 搜索过滤
   if (searchKeyword.value) {
-    result = result.filter(app => 
-      app.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
-      app.description.toLowerCase().includes(searchKeyword.value.toLowerCase())
-    )
+    result = result.filter(app => app.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
   }
-  // 分类过滤
   if (activeCategory.value !== 'all') {
     result = result.filter(app => app.category === activeCategory.value)
   }
-  // 状态过滤
   if (activeStatus.value === 'installed') {
     result = result.filter(app => app.installed)
   } else if (activeStatus.value === 'not_installed') {
     result = result.filter(app => !app.installed)
-  } else if (activeStatus.value === 'updatable') {
-    result = result.filter(app => app.hasUpdate)
   }
   return result
 })
 
 const openInstallDrawer = (app) => {
-  if (app.installed) { openAppDetail(app); return }
   selectedApp.value = app
-  installForm.value = { name: `${app.key}-${app.default_version}`, version: app.default_version, config: { port: getDefaultPort(app.key) } }
+  installForm.value = {
+    name: `${app.key}-${app.default_version}-${Date.now()}`,
+    version: app.default_version,
+    externalAccess: false,
+    cpuLimit: 0,
+    memoryLimit: 0,
+    restartPolicy: 'no',
+    maxRetries: 5,
+    config: { port: getDefaultPort(app.key), password: '' },
+    extensions: ['mysql', 'gd', 'curl', 'zip']
+  }
   drawerVisible.value = true
 }
 
@@ -436,13 +446,19 @@ const getDefaultPort = (key) => {
   return ports[key] || 8080
 }
 
-const copyLogs = () => { if (installLogs.value) { navigator.clipboard.writeText(installLogs.value); ElMessage.success('日志已复制') } }
-const clearInstallLogs = () => { installLogs.value = ''; ElMessage.success('日志已清空') }
-const scrollToBottom = () => { nextTick(() => { if (logContainerRef.value) { const pre = logContainerRef.value.querySelector('pre'); if (pre) pre.scrollTop = pre.scrollHeight } }) }
+const copyLogs = () => {
+  if (installLogs.value) {
+    navigator.clipboard.writeText(installLogs.value)
+    ElMessage.success('日志已复制')
+  }
+}
+
+const clearInstallLogs = () => {
+  installLogs.value = ''
+  ElMessage.success('日志已清空')
+}
 
 const confirmInstall = async () => {
-  if (!installForm.value.version) { ElMessage.warning('请选择版本'); return }
-  
   installLogs.value = ''
   installLogDrawerVisible.value = true
   installing.value = true
@@ -450,24 +466,35 @@ const confirmInstall = async () => {
   const steps = getInstallSteps(selectedApp.value.name, installForm.value.version, installForm.value.config.port)
   logStep = 0
   logInterval = setInterval(() => {
-    if (logStep < steps.length) { installLogs.value += steps[logStep] + '\n'; logStep++; scrollToBottom() }
-    else { if (logInterval) clearInterval(logInterval); logInterval = null }
-  }, 300)
+    if (logStep < steps.length) {
+      installLogs.value += steps[logStep] + '\n'
+      logStep++
+    } else {
+      clearInterval(logInterval)
+      logInterval = null
+    }
+  }, 500)
   
   try {
-    await axios.post('/api/apps/install', { app_key: selectedApp.value.key, version: installForm.value.version, name: installForm.value.name, config: installForm.value.config })
-    const waitForLogs = () => {
-      if (logStep >= steps.length) { if (logInterval) clearInterval(logInterval); logInterval = null; ElMessage.success('安装成功！'); drawerVisible.value = false; setTimeout(() => fetchApps(), 1000) }
-      else { setTimeout(waitForLogs, 500) }
-    }
-    waitForLogs()
+    await axios.post('/api/apps/install', {
+      app_key: selectedApp.value.key,
+      version: installForm.value.version,
+      name: installForm.value.name,
+      config: installForm.value.config
+    })
+    setTimeout(() => {
+      if (logInterval) clearInterval(logInterval)
+      ElMessage.success('安装成功！')
+      drawerVisible.value = false
+      setTimeout(() => fetchApps(), 1000)
+    }, 3000)
   } catch (err) {
     if (logInterval) clearInterval(logInterval)
-    logInterval = null
-    installLogs.value += `\n[${new Date().toLocaleString()}] ❌ 安装失败: ${err.response?.data?.error || err.message}\n`
-    scrollToBottom()
+    installLogs.value += `\n❌ 安装失败: ${err.response?.data?.error || err.message}\n`
     ElMessage.error('安装失败: ' + (err.response?.data?.error || err.message))
-  } finally { installing.value = false }
+  } finally {
+    installing.value = false
+  }
 }
 
 onMounted(() => { fetchApps() })
@@ -481,7 +508,7 @@ onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 .categories-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .categories-right { flex-shrink: 0; }
 .category-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.category-item { padding: 6px 14px; font-size: 13px; color: #6b7280; cursor: pointer; position: relative; }
+.category-item { padding: 6px 14px; font-size: 13px; color: #6b7280; cursor: pointer; }
 .category-item:hover { background-color: #f3f4f6; color: #477779; }
 .category-item.active { background-color: #477779; color: white; }
 .category-divider { width: 1px; height: 24px; background-color: #e5e7eb; }
@@ -493,10 +520,15 @@ onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 .app-icon { flex-shrink: 0; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
 .app-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .app-name { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 4px; }
-.app-description { font-size: 11px; color: #9ca3af; line-height: 1.3; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.app-description { font-size: 11px; color: #9ca3af; line-height: 1.3; margin-bottom: 8px; }
 .app-footer { display: flex; justify-content: flex-end; gap: 8px; }
 .drawer-content { padding: 0 4px; }
 .drawer-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+
+.config-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.config-section .section-title { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 16px; padding-left: 8px; border-left: 3px solid #477779; }
+.unit { margin-left: 8px; color: #9ca3af; font-size: 12px; }
+.form-tip { font-size: 11px; color: #9ca3af; margin-top: 4px; }
 
 .detail-content { padding: 0 4px; }
 .detail-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
@@ -514,6 +546,5 @@ onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 
 .logs-content { height: 100%; display: flex; flex-direction: column; gap: 12px; }
 .log-controls { display: flex; gap: 8px; }
-.log-container { flex: 1; overflow-y: auto; }
 .log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 0; min-height: 300px; }
 </style>
