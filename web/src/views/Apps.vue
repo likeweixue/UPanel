@@ -1,37 +1,91 @@
 <template>
   <div class="apps-container">
+    <!-- 顶部分类面板 -->
     <div class="categories-panel">
-      <div class="categories-left">
-        <div class="category-group">
-          <span v-for="cat in leftCategories" :key="cat.key" class="category-item"
-            :class="{ active: activeCategory === cat.key }" @click="activeCategory = cat.key">
-            {{ cat.name }}
-          </span>
+      <div class="categories-wrapper">
+        <div class="categories-left">
+          <div class="category-group">
+            <span 
+              v-for="cat in leftCategories" 
+              :key="cat.key"
+              class="category-item"
+              :class="{ active: activeCategory === cat.key }"
+              @click="activeCategory = cat.key"
+            >
+              {{ cat.name }}
+            </span>
+          </div>
+          <div class="category-divider"></div>
+          <div class="category-group">
+            <span 
+              v-for="cat in rightCategories" 
+              :key="cat.key"
+              class="category-item"
+              :class="{ active: activeStatus === cat.key }"
+              @click="activeStatus = cat.key"
+            >
+              {{ cat.name }}
+            </span>
+          </div>
+          <div class="category-divider"></div>
+          <div class="category-group">
+            <span 
+              class="category-item"
+              :class="{ active: activeStatus === 'updatable' }"
+              @click="activeStatus = 'updatable'"
+            >
+              可更新
+              <span v-if="updatableCount > 0" class="update-badge">{{ updatableCount }}</span>
+            </span>
+          </div>
         </div>
-        <div class="category-divider"></div>
-        <div class="category-group">
-          <span v-for="cat in rightCategories" :key="cat.key" class="category-item"
-            :class="{ active: activeStatus === cat.key }" @click="activeStatus = cat.key">
-            {{ cat.name }}
-          </span>
+        <div class="categories-right">
+          <el-input 
+            v-model="searchKeyword" 
+            placeholder="搜索应用" 
+            prefix-icon="Search"
+            clearable
+            size="small"
+            style="width: 220px"
+          />
         </div>
       </div>
     </div>
 
+    <!-- 下方应用列表面板 -->
     <div class="apps-panel">
       <div class="apps-grid">
-        <div v-for="app in filteredApps" :key="app.id" class="app-card" @click="openAppDetail(app)">
+        <div 
+          v-for="app in filteredApps" 
+          :key="app.id"
+          class="app-card"
+          @click="openAppDetail(app)"
+        >
           <div class="app-icon" :style="{ backgroundColor: app.iconBg }">
             <el-icon :size="32" :color="app.iconColor">
               <component :is="app.icon" />
             </el-icon>
           </div>
+          
           <div class="app-info">
             <div class="app-name">{{ app.name }}</div>
             <div class="app-description">{{ app.description }}</div>
             <div class="app-footer">
-              <el-button size="small" :type="app.installed ? 'info' : 'primary'" @click.stop="openInstallDrawer(app)">
-                {{ app.installed ? '已安装' : '安装' }}
+              <el-button 
+                size="small" 
+                :type="app.installed ? 'info' : 'primary'"
+                :disabled="app.installed"
+                @click.stop="openInstallDrawer(app)"
+              >
+                {{ app.installed ? `已安装` : '安装' }}
+              </el-button>
+              <el-button 
+                v-if="app.hasUpdate"
+                size="small" 
+                type="warning"
+                @click.stop="updateApp(app)"
+              >
+                更新
               </el-button>
             </div>
           </div>
@@ -40,9 +94,14 @@
     </div>
 
     <!-- 安装抽屉 -->
-    <el-drawer v-model="drawerVisible" :title="`安装 ${selectedApp?.name}`" direction="rtl" size="450px">
+    <el-drawer
+      v-model="drawerVisible"
+      :title="`安装 ${selectedApp?.name}`"
+      direction="rtl"
+      size="450px"
+    >
       <div class="drawer-content">
-        <el-form :model="installForm" label-width="100px">
+        <el-form :model="installForm" label-width="100px" label-position="left">
           <el-form-item label="应用名称">
             <el-input v-model="installForm.name" :placeholder="`例如: ${selectedApp?.name}-test`" />
           </el-form-item>
@@ -56,6 +115,14 @@
               <el-input-number v-model="installForm.config.port" :min="80" :max="8099" />
             </el-form-item>
           </template>
+          <template v-if="selectedApp?.key === 'mysql'">
+            <el-form-item label="端口">
+              <el-input-number v-model="installForm.config.port" :min="3306" :max="3399" />
+            </el-form-item>
+            <el-form-item label="root密码">
+              <el-input v-model="installForm.config.password" type="password" placeholder="留空则自动生成" />
+            </el-form-item>
+          </template>
         </el-form>
         <div class="drawer-footer">
           <el-button @click="drawerVisible = false">取消</el-button>
@@ -65,7 +132,12 @@
     </el-drawer>
 
     <!-- 应用详情抽屉 -->
-    <el-drawer v-model="detailDrawerVisible" :title="currentApp?.name" direction="rtl" size="500px">
+    <el-drawer
+      v-model="detailDrawerVisible"
+      :title="currentApp?.name"
+      direction="rtl"
+      size="500px"
+    >
       <div class="detail-content">
         <div class="detail-section">
           <div class="detail-header">
@@ -124,7 +196,13 @@
     </el-drawer>
 
     <!-- 安装日志抽屉 -->
-    <el-drawer v-model="installLogDrawerVisible" title="安装日志" direction="rtl" size="700px" :close-on-click-modal="false">
+    <el-drawer
+      v-model="installLogDrawerVisible"
+      title="安装日志"
+      direction="rtl"
+      size="700px"
+      :close-on-click-modal="false"
+    >
       <div class="logs-content">
         <div class="log-controls">
           <el-button size="small" @click="copyLogs" :disabled="!installLogs">复制日志</el-button>
@@ -137,7 +215,12 @@
     </el-drawer>
 
     <!-- 容器日志抽屉 -->
-    <el-drawer v-model="logDrawerVisible" title="容器日志" direction="rtl" size="600px">
+    <el-drawer
+      v-model="logDrawerVisible"
+      title="容器日志"
+      direction="rtl"
+      size="600px"
+    >
       <div class="logs-content">
         <div class="log-controls">
           <el-button size="small" @click="refreshLogs">刷新</el-button>
@@ -156,6 +239,7 @@ import axios from 'axios'
 
 const activeCategory = ref('all')
 const activeStatus = ref('all')
+const searchKeyword = ref('')
 const drawerVisible = ref(false)
 const detailDrawerVisible = ref(false)
 const logDrawerVisible = ref(false)
@@ -194,6 +278,11 @@ const rightCategories = [
 
 const apps = ref([])
 
+// 可更新数量
+const updatableCount = computed(() => {
+  return apps.value.filter(app => app.hasUpdate).length
+})
+
 const getInstallSteps = (appName, version, port) => {
   const now = new Date()
   const timeStr = now.toLocaleString()
@@ -227,7 +316,9 @@ const fetchContainers = async () => {
     const containerNames = containers.map(c => c.name)
     apps.value = apps.value.map(app => {
       const isInstalled = containerNames.some(name => name.includes(app.key))
-      return { ...app, installed: isInstalled }
+      // 模拟可更新状态（实际应该从后端获取）
+      const hasUpdate = isInstalled && Math.random() > 0.7
+      return { ...app, installed: isInstalled, hasUpdate }
     })
   } catch (err) { console.error('获取容器列表失败:', err) }
 }
@@ -304,12 +395,32 @@ const uninstallApp = async () => {
   catch (err) { ElMessage.error('卸载失败: ' + err.message) }
 }
 
+const updateApp = (app) => {
+  ElMessage.info(`更新 ${app.name} 功能开发中`)
+}
+
 const availableVersions = computed(() => selectedApp.value ? selectedApp.value.versions || [] : [])
 const filteredApps = computed(() => {
   let result = apps.value
-  if (activeCategory.value !== 'all') result = result.filter(app => app.category === activeCategory.value)
-  if (activeStatus.value === 'installed') result = result.filter(app => app.installed)
-  else if (activeStatus.value === 'not_installed') result = result.filter(app => !app.installed)
+  // 搜索过滤
+  if (searchKeyword.value) {
+    result = result.filter(app => 
+      app.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+      app.description.toLowerCase().includes(searchKeyword.value.toLowerCase())
+    )
+  }
+  // 分类过滤
+  if (activeCategory.value !== 'all') {
+    result = result.filter(app => app.category === activeCategory.value)
+  }
+  // 状态过滤
+  if (activeStatus.value === 'installed') {
+    result = result.filter(app => app.installed)
+  } else if (activeStatus.value === 'not_installed') {
+    result = result.filter(app => !app.installed)
+  } else if (activeStatus.value === 'updatable') {
+    result = result.filter(app => app.hasUpdate)
+  }
   return result
 })
 
@@ -365,36 +476,34 @@ onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 
 <style scoped>
 .apps-container { height: 100%; display: flex; flex-direction: column; gap: 16px; }
-.categories-panel { background: #fff; border-radius: 4px; padding: 12px 16px; }
+.categories-panel { background: #fff; padding: 12px 16px; }
+.categories-wrapper { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .categories-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.categories-right { flex-shrink: 0; }
 .category-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.category-item { padding: 6px 14px; font-size: 13px; color: #6b7280; cursor: pointer; border-radius: 4px; }
+.category-item { padding: 6px 14px; font-size: 13px; color: #6b7280; cursor: pointer; position: relative; }
 .category-item:hover { background-color: #f3f4f6; color: #477779; }
 .category-item.active { background-color: #477779; color: white; }
 .category-divider { width: 1px; height: 24px; background-color: #e5e7eb; }
-.apps-panel { background: #fff; border-radius: 4px; padding: 20px; flex: 1; overflow-y: auto; }
+.update-badge { display: inline-block; background-color: #f59e0b; color: white; font-size: 11px; padding: 0 6px; border-radius: 10px; margin-left: 6px; }
+.apps-panel { background: #fff; padding: 20px; flex: 1; overflow-y: auto; }
 .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-.app-card { display: flex; gap: 12px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; }
+.app-card { display: flex; gap: 12px; padding: 14px; border: 1px solid #e5e7eb; cursor: pointer; }
 .app-card:hover { border-color: #477779; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.app-icon { flex-shrink: 0; width: 52px; height: 52px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.app-icon { flex-shrink: 0; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
 .app-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .app-name { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 4px; }
-.app-description { font-size: 11px; color: #9ca3af; line-height: 1.3; margin-bottom: 8px; }
-.app-footer { display: flex; justify-content: flex-end; }
+.app-description { font-size: 11px; color: #9ca3af; line-height: 1.3; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.app-footer { display: flex; justify-content: flex-end; gap: 8px; }
 .drawer-content { padding: 0 4px; }
 .drawer-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
-
-/* 统一按钮样式 */
-.el-button--small { height: 28px !important; line-height: 28px !important; padding: 0 12px !important; font-size: 12px !important; }
-.el-input__wrapper { height: 28px !important; padding: 0 8px !important; }
-.el-tabs__item { height: 32px !important; line-height: 32px !important; font-size: 13px !important; }
 
 .detail-content { padding: 0 4px; }
 .detail-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
 .detail-section:last-child { border-bottom: none; }
 .section-title { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
 .detail-header { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
-.app-icon-small { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.app-icon-small { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
 .app-name-large { font-size: 18px; font-weight: 600; color: #1f2937; }
 .app-version { font-size: 12px; color: #9ca3af; margin-top: 4px; }
 .detail-desc { font-size: 13px; color: #6b7280; line-height: 1.5; }
@@ -406,5 +515,5 @@ onUnmounted(() => { if (logInterval) clearInterval(logInterval) })
 .logs-content { height: 100%; display: flex; flex-direction: column; gap: 12px; }
 .log-controls { display: flex; gap: 8px; }
 .log-container { flex: 1; overflow-y: auto; }
-.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 0; min-height: 300px; }
+.log-pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 0; min-height: 300px; }
 </style>

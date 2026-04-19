@@ -363,3 +363,438 @@ body.dark-mode .logout-title {
 body.dark-mode .logout-desc {
   color: #9ca3af !important;
 }
+/* ============================================
+   增强 UI 厚度感 - 参考 1Panel 风格
+   ============================================ */
+
+/* 1. 卡片阴影增强 */
+.el-card,
+.stats-panel,
+.gauges-panel,
+.chart-panel,
+.info-panel,
+.notification-panel,
+.apps-panel,
+.files-panel,
+.websites-panel,
+.databases-panel,
+.containers-panel,
+.content-panel {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease !important;
+}
+
+.el-card:hover,
+.stats-panel:hover,
+.gauges-panel:hover,
+.chart-panel:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 2. 菜单项悬浮效果增强 */
+.menu-item {
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+  margin: 4px 0 !important;
+}
+
+.menu-item:hover {
+  background-color: #f3f4f6 !important;
+  transform: translateX(2px) !important;
+}
+
+.menu-item.active {
+  background: linear-gradient(135deg, #477779 0%, #2d5a5c 100%) !important;
+  box-shadow: 0 2px 8px rgba(71, 119, 121, 0.3) !important;
+}
+
+/* 3. 按钮增强 */
+.el-button--primary {
+  background: linear-gradient(135deg, #477779 0%, #2d5a5c 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 4px rgba(71, 119, 121, 0.2) !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-button--primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(71, 119, 121, 0.3) !important;
+}
+
+.el-button--primary:active {
+  transform: translateY(0) !important;
+}
+
+/* 4. 表格增强 */
+.el-table {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.el-table__header th {
+  background-color: #f9fafb !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+.el-table--striped .el-table__row--striped td {
+  background-color: #fafafa !important;
+}
+
+/* 5. 输入框增强 */
+.el-input__wrapper {
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #477779 inset !important;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px rgba(71, 119, 121, 0.2) !important;
+}
+
+/* 6. 标签页增强 */
+.el-tabs__item {
+  font-weight: 500 !important;
+  padding: 0 16px !important;
+  border-radius: 20px !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-tabs__item.is-active {
+  background: linear-gradient(135deg, #477779 0%, #2d5a5c 100%) !important;
+  color: white !important;
+}
+
+.el-tabs__active-bar {
+  display: none !important;
+}
+
+/* 7. 抽屉增强 */
+.el-drawer {
+  border-radius: 16px 0 0 16px !important;
+}
+
+.el-drawer__header {
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 20px 24px !important;
+}
+
+.el-drawer__body {
+  padding: 20px 24px !important;
+}
+
+/* 8. 对话框增强 */
+.el-dialog {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+.el-dialog__header {
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 20px 24px !important;
+}
+
+/* 9. 下拉菜单增强 */
+.el-dropdown-menu {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+  padding: 8px !important;
+}
+
+.el-dropdown-menu__item {
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+}
+
+/* 10. 开关增强 */
+.el-switch__core {
+  border-radius: 20px !important;
+}
+
+/* 11. 加载状态增强 */
+.el-loading-spinner {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
+}
+
+/* 12. 顶部导航栏增强 */
+.top-bar {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* 13. 统计卡片数字增强 */
+.stat-number {
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #1f2937 0%, #374151 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+/* 14. 圆环进度增强 */
+.gauge-fill {
+  filter: drop-shadow(0 2px 4px rgba(71, 119, 121, 0.3)) !important;
+}
+
+/* 15. 面包屑增强 */
+.breadcrumb-panel {
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 16. 深色模式下的厚度感 */
+body.dark-mode .el-card,
+body.dark-mode .stats-panel,
+body.dark-mode .gauges-panel,
+body.dark-mode .chart-panel {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+body.dark-mode .el-table__header th {
+  background-color: #2a2a2a !important;
+}
+
+body.dark-mode .el-table--striped .el-table__row--striped td {
+  background-color: #252525 !important;
+}
+
+/* 17. 应用商店卡片增强 */
+.app-card {
+  border-radius: 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.app-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 18. 网站卡片增强 */
+.website-card {
+  border-radius: 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.website-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 19. 监控图表容器增强 */
+.chart-container {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* 20. 进程列表增强 */
+.process-card .el-table {
+  border-radius: 12px !important;
+}
+
+/* 取消抽屉的圆角 - 恢复直角 */
+.el-drawer {
+  border-radius: 0 !important;
+}
+
+.el-drawer.rtl {
+  border-radius: 0 !important;
+}
+
+.el-drawer.ltr {
+  border-radius: 0 !important;
+}
+
+.el-drawer.ttb {
+  border-radius: 0 !important;
+}
+
+.el-drawer.btt {
+  border-radius: 0 !important;
+}
+
+/* 抽屉头部和底部也保持直角 */
+.el-drawer__header {
+  border-radius: 0 !important;
+}
+
+.el-drawer__body {
+  border-radius: 0 !important;
+}
+
+.el-drawer__footer {
+  border-radius: 0 !important;
+}
+
+/* ============================================
+   全局卡片改为直角
+   ============================================ */
+
+/* 所有卡片容器改为直角 */
+.el-card,
+.stats-panel,
+.gauges-panel,
+.chart-panel,
+.info-panel,
+.notification-panel,
+.apps-panel,
+.files-panel,
+.websites-panel,
+.databases-panel,
+.containers-panel,
+.content-panel,
+.categories-panel,
+.top-panel,
+.breadcrumb-panel,
+.process-card,
+.chart-card,
+.settings-section,
+.info-card,
+.notification-card,
+.stat-card,
+.gauge-card,
+.app-card,
+.website-card,
+.database-card,
+.container-card,
+.backup-item,
+.key-item,
+.ip-list,
+.user-list {
+  border-radius: 0 !important;
+}
+
+/* 表格圆角 */
+.el-table {
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+/* 按钮圆角改为直角 */
+.el-button {
+  border-radius: 0 !important;
+}
+
+/* 输入框圆角改为直角 */
+.el-input__wrapper {
+  border-radius: 0 !important;
+}
+
+/* 下拉菜单圆角改为直角 */
+.el-dropdown-menu {
+  border-radius: 0 !important;
+}
+
+/* 对话框圆角改为直角 */
+.el-dialog {
+  border-radius: 0 !important;
+}
+
+/* 标签页圆角改为直角 */
+.el-tabs__item {
+  border-radius: 0 !important;
+}
+
+/* 菜单项圆角改为直角 */
+.menu-item,
+.submenu-item {
+  border-radius: 0 !important;
+}
+
+/* 面包屑圆角改为直角 */
+.breadcrumb-panel {
+  border-radius: 0 !important;
+}
+
+/* 分页圆角改为直角 */
+.el-pagination button,
+.el-pagination .el-pager li {
+  border-radius: 0 !important;
+}
+
+/* 标签圆角改为直角 */
+.el-tag {
+  border-radius: 0 !important;
+}
+
+/* 步骤条圆角改为直角 */
+.el-step__icon {
+  border-radius: 0 !important;
+}
+
+/* 时间选择器圆角改为直角 */
+.el-time-spinner__item {
+  border-radius: 0 !important;
+}
+
+/* 级联选择器圆角改为直角 */
+.el-cascader__tags .el-tag {
+  border-radius: 0 !important;
+}
+
+/* 穿梭框圆角改为直角 */
+.el-transfer-panel {
+  border-radius: 0 !important;
+}
+
+/* 上传组件圆角改为直角 */
+.el-upload-dragger {
+  border-radius: 0 !important;
+}
+
+/* 消息提示圆角改为直角 */
+.el-message {
+  border-radius: 0 !important;
+}
+
+/* 通知圆角改为直角 */
+.el-notification {
+  border-radius: 0 !important;
+}
+
+/* 气泡确认框圆角改为直角 */
+.el-popconfirm {
+  border-radius: 0 !important;
+}
+
+/* 深色模式下的卡片也改为直角 */
+body.dark-mode .el-card,
+body.dark-mode .stats-panel,
+body.dark-mode .gauges-panel,
+body.dark-mode .chart-panel {
+  border-radius: 0 !important;
+}
+
+/* 全局 radio-button 主题色覆盖 */
+.el-radio-group .el-radio-button.is-active .el-radio-button__inner {
+  background-color: #477779 !important;
+  border-color: #477779 !important;
+  color: white !important;
+}
+
+.el-radio-group .el-radio-button__inner:hover {
+  color: #477779 !important;
+}
+
+/* 直角样式 */
+.el-radio-button__inner {
+  border-radius: 0 !important;
+}
+
+/* 暗色模式下的 radio-button */
+body.dark-mode .el-radio-group .el-radio-button.is-active .el-radio-button__inner {
+  background-color: #5e8a8c !important;
+  border-color: #5e8a8c !important;
+}
+
+body.dark-mode .el-radio-group .el-radio-button__inner:hover {
+  color: #5e8a8c !important;
+}

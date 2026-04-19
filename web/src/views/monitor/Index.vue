@@ -412,3 +412,37 @@ onUnmounted(() => {
   margin-bottom: 16px;
 }
 </style>
+
+<style scoped>
+/* 覆盖监控页面的圆角和主题色 */
+.monitor-container .top-bar {
+  background: #ffffff;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 时间选择按钮组圆角改为直角 */
+.monitor-container .el-radio-group .el-radio-button__inner {
+  border-radius: 0 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* 选中状态使用主题色 */
+.monitor-container .el-radio-group .el-radio-button.is-active .el-radio-button__inner {
+  background-color: #477779 !important;
+  border-color: #477779 !important;
+  color: white !important;
+}
+
+/* 悬浮状态 */
+.monitor-container .el-radio-group .el-radio-button__inner:hover {
+  color: #477779 !important;
+}
+
+/* 刷新按钮 */
+.monitor-container .top-bar .el-button {
+  border-radius: 0 !important;
+}
+</style>
