@@ -148,7 +148,7 @@
     <div class="content-panel" v-if="activeTab === 'about'">
       <div class="about-section">
         <div class="about-logo"><h1 class="logo">UPanel</h1><p class="slogan">轻量级容器管理面板</p></div>
-        <div class="about-info"><div class="info-row"><span class="label">版本</span><span class="value">v0.1.0</span></div></div>
+        <div class="about-info"><div class="info-row"><span class="label">版本</span><span class="value">v0.1.3</span></div></div>
         <div class="about-links"><a href="https://github.com/likeweixue/UPanel" target="_blank">GitHub</a></div>
         <div class="about-copyright"><p>© 2024 UPanel. 开源容器面板</p></div>
       </div>

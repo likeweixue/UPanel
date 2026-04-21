@@ -63,7 +63,7 @@
       <footer class="footer">
         <span>UPanel 开源容器面板</span>
         <a href="https://github.com/likeweixue/UPanel" target="_blank" class="footer-link">GitHub</a>
-        <span class="footer-version">v0.1.0</span>
+        <span class="footer-version">v0.1.3</span>
       </footer>
     </div>
   </div>

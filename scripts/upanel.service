@@ -1,0 +1,16 @@
+[Unit]
+Description=UPanel Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/upanel
+ExecStart=/opt/upanel/bin/upanel
+Restart=always
+RestartSec=10
+Environment="STATIC_PATH=/opt/upanel/web"
+
+[Install]
+WantedBy=multi-user.target

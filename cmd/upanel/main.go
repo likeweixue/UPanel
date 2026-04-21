@@ -12,7 +12,7 @@ import (
 	"upanel/internal/middleware"
 )
 
-var Version = "v0.1.0"
+var Version = "v0.1.3"
 
 func main() {
 	// 加载配置
@@ -29,7 +29,7 @@ func main() {
 	
 	r := gin.Default()
 	
-	// 允许跨域（开发用）
+	// 允许跨域
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
@@ -41,15 +41,18 @@ func main() {
 		c.Next()
 	})
 	
-	// 静态文件服务（生产环境）
+	// ========== 静态文件服务 ==========
+	// 提供前端静态资源
 	staticPath := config.AppConfig.StaticPath
 	if _, err := os.Stat(staticPath); err == nil {
-		// 提供静态文件
+		// 提供 assets 目录
 		r.Static("/assets", filepath.Join(staticPath, "assets"))
+		// 提供根目录文件
 		r.StaticFile("/favicon.ico", filepath.Join(staticPath, "favicon.ico"))
+		r.StaticFile("/vite.svg", filepath.Join(staticPath, "vite.svg"))
 		r.StaticFile("/icons.svg", filepath.Join(staticPath, "icons.svg"))
 		
-		// 处理前端路由
+		// 处理前端路由 - 所有非 API 请求返回 index.html
 		r.NoRoute(func(c *gin.Context) {
 			// API 请求返回 404
 			if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
@@ -58,30 +61,6 @@ func main() {
 			}
 			// 返回前端首页
 			c.File(filepath.Join(staticPath, "index.html"))
-		})
-	}
-	
-	// 安全入口检查（如果配置了）
-	securityEntry := config.AppConfig.GetSecurityEntry()
-	if securityEntry != "" {
-		// 添加安全入口中间件
-		r.Use(func(c *gin.Context) {
-			// 跳过登录页面和静态资源
-			if c.Request.URL.Path == "/login" ||
-				len(c.Request.URL.Path) >= 5 && c.Request.URL.Path[:5] == "/api/" ||
-				len(c.Request.URL.Path) >= 7 && c.Request.URL.Path[:7] == "/assets" {
-				c.Next()
-				return
-			}
-			// 检查安全入口
-			if c.Request.URL.Path != securityEntry && 
-			   !(len(c.Request.URL.Path) > len(securityEntry) && 
-			     c.Request.URL.Path[:len(securityEntry)] == securityEntry) {
-				c.Header("Location", securityEntry)
-				c.AbortWithStatus(302)
-				return
-			}
-			c.Next()
 		})
 	}
 	
@@ -197,6 +176,15 @@ func main() {
 			settingsHandler := handler.NewSettingsHandler()
 			authorized.GET("/settings", settingsHandler.GetAll)
 			authorized.PUT("/settings", settingsHandler.Update)
+			
+			// Docker 配置
+			dockerHandler := handler.NewDockerHandler()
+			docker := authorized.Group("/docker")
+			{
+				docker.GET("/config", dockerHandler.GetConfig)
+				docker.PUT("/config", dockerHandler.UpdateConfig)
+				docker.POST("/restart", dockerHandler.RestartDocker)
+			}
 		}
 	}
 	
@@ -204,8 +192,5 @@ func main() {
 	addr := ":" + config.AppConfig.Port
 	fmt.Printf("🚀 UPanel %s 启动成功\n", Version)
 	fmt.Printf("📍 监听地址: http://localhost%s\n", addr)
-	if securityEntry != "" {
-		fmt.Printf("🔐 安全入口: %s\n", securityEntry)
-	}
 	r.Run(addr)
 }
