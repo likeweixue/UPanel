@@ -56,7 +56,7 @@
       </div>
     </div>
 
-    <!-- 右侧登录区域 - 更窄 -->
+    <!-- 右侧登录区域 -->
     <div class="login-right">
       <div class="login-card">
         <div class="card-header">
@@ -66,34 +66,13 @@
         
         <el-form :model="form" :rules="rules" ref="formRef" class="login-form">
           <el-form-item prop="username">
-            <el-input 
-              v-model="form.username" 
-              placeholder="用户名" 
-              size="large"
-              prefix-icon="User"
-            />
+            <el-input v-model="form.username" placeholder="用户名" size="large" prefix-icon="User" />
           </el-form-item>
           <el-form-item prop="password">
-            <el-input 
-              v-model="form.password" 
-              type="password" 
-              placeholder="密码" 
-              size="large"
-              prefix-icon="Lock"
-              show-password
-              @keyup.enter="handleLogin"
-            />
+            <el-input v-model="form.password" type="password" placeholder="密码" size="large" prefix-icon="Lock" show-password @keyup.enter="handleLogin" />
           </el-form-item>
           <el-form-item>
-            <el-button 
-              type="primary" 
-              size="large" 
-              class="login-btn"
-              :loading="loading"
-              @click="handleLogin"
-            >
-              登 录
-            </el-button>
+            <el-button type="primary" size="large" class="login-btn" :loading="loading" @click="handleLogin">登录</el-button>
           </el-form-item>
         </el-form>
         
@@ -155,7 +134,6 @@ const handleLogin = async () => {
   background: linear-gradient(135deg, #477779 0%, #2d5a5c 50%, #1a3d3f 100%);
 }
 
-/* 左侧介绍区域 */
 .login-left {
   flex: 1;
   display: flex;
@@ -217,44 +195,40 @@ const handleLogin = async () => {
   opacity: 0.7;
 }
 
-/* 右侧登录区域 - 宽度 280px */
 .login-right {
-  width: 280px;
+  width: 420px;
   background: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px;
+  padding: 40px 32px;
 }
 
 .login-card {
   width: 100%;
+  max-width: 360px;
 }
 
 .card-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .card-header h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 4px 0;
+  margin: 0 0 6px 0;
 }
 
 .card-header p {
-  font-size: 12px;
+  font-size: 13px;
   color: #9ca3af;
   margin: 0;
 }
 
 .login-form {
-  margin-bottom: 16px;
-}
-
-.login-form :deep(.el-form-item) {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .login-form :deep(.el-input__wrapper) {
@@ -277,7 +251,7 @@ const handleLogin = async () => {
   border: none;
   border-radius: 8px;
   padding: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -292,7 +266,7 @@ const handleLogin = async () => {
   gap: 6px;
   font-size: 11px;
   color: #9ca3af;
-  padding: 8px;
+  padding: 10px;
   background: #f9fafb;
   border-radius: 8px;
 }

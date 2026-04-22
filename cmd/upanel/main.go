@@ -12,7 +12,7 @@ import (
 	"upanel/internal/middleware"
 )
 
-var Version = "v0.1.3"
+var Version = "v0.1.4"
 
 func main() {
 	// 加载配置
