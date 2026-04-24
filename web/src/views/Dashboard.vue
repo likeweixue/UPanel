@@ -1,15 +1,6 @@
 <template>
   <div class="dashboard">
     <!-- 暗色模式开关 -->
-    <div class="theme-switch">
-      <el-switch
-        v-model="isDarkMode"
-        size="large"
-        active-icon="Moon"
-        inactive-icon="Sunny"
-        @change="toggleDarkMode"
-      />
-    </div>
     
     <div class="dashboard-main">
       <!-- 左侧区域 -->
@@ -237,3 +228,20 @@ onUnmounted(() => {
 .notice-title { font-size: 13px; color: #1f2937; }
 .notice-time { font-size: 10px; color: #9ca3af; }
 </style>
+
+// 在 onMounted 中添加主题同步
+const syncTheme = () => {
+  const saved = localStorage.getItem('theme')
+  if (saved === 'davinci') {
+    document.body.classList.add('theme-davinci')
+    document.body.classList.remove('theme-light')
+  } else {
+    document.body.classList.add('theme-light')
+    document.body.classList.remove('theme-davinci')
+  }
+}
+
+onMounted(() => {
+  // ... 原有代码
+  syncTheme()
+})

@@ -18,76 +18,22 @@ export const themes = {
       info: '#477779'
     }
   },
-  dark: {
-    name: '暗色',
-    description: '护眼暗黑模式',
+  davinci: {
+    name: 'DaVinci Resolve',
+    description: '专业视频编辑软件配色风格',
     colors: {
-      primary: '#5e8a8c',
-      primaryLight: '#7a9fa1',
-      primaryDark: '#3a6e70',
+      primary: '#e67e22',
+      primaryLight: '#f39c12',
+      primaryDark: '#d35400',
       bg: '#1a1a1a',
-      cardBg: '#1e1e1e',
-      text: '#e5e7eb',
-      textSecondary: '#9ca3af',
-      border: '#2a2a2a',
-      success: '#34ce57',
-      warning: '#f9c74f',
-      danger: '#c62828',
-      info: '#5e8a8c'
-    }
-  },
-  gold: {
-    name: '黑金',
-    description: '奢华黑金主题',
-    colors: {
-      primary: '#d4af37',
-      primaryLight: '#f0c674',
-      primaryDark: '#b8960c',
-      bg: '#0a0a0a',
-      cardBg: '#111111',
-      text: '#e8e8e8',
+      cardBg: '#2a2a2a',
+      text: '#e0e0e0',
       textSecondary: '#a0a0a0',
-      border: '#2a2a2a',
-      success: '#2e7d32',
-      warning: '#ed6c02',
-      danger: '#c62828',
-      info: '#d4af37'
-    }
-  },
-  blue: {
-    name: '深海蓝',
-    description: '深邃蓝色主题',
-    colors: {
-      primary: '#1a5276',
-      primaryLight: '#2e86c1',
-      primaryDark: '#0e2f44',
-      bg: '#0a1620',
-      cardBg: '#0d1c2a',
-      text: '#e0e0e0',
-      textSecondary: '#90a4ae',
-      border: '#1a2a3a',
-      success: '#2e7d32',
-      warning: '#ed6c02',
-      danger: '#c62828',
-      info: '#1a5276'
-    }
-  },
-  green: {
-    name: '森林绿',
-    description: '护眼绿色主题',
-    colors: {
-      primary: '#1b5e20',
-      primaryLight: '#2e7d32',
-      primaryDark: '#0d3b12',
-      bg: '#0a1a0a',
-      cardBg: '#0d1f0d',
-      text: '#e0e0e0',
-      textSecondary: '#90a47e',
-      border: '#1a2a1a',
-      success: '#2e7d32',
-      warning: '#ed6c02',
-      danger: '#c62828',
-      info: '#1b5e20'
+      border: '#3a3a3a',
+      success: '#5a8a5a',
+      warning: '#f1c40f',
+      danger: '#e74c3c',
+      info: '#e67e22'
     }
   }
 }
@@ -115,7 +61,7 @@ export const applyTheme = (themeName) => {
   })
   
   // 添加主题类名
-  document.body.classList.remove('theme-light', 'theme-dark', 'theme-gold', 'theme-blue', 'theme-green')
+  document.body.classList.remove('theme-light', 'theme-davinci')
   document.body.classList.add(`theme-${themeName}`)
   
   // 触发主题变更事件

@@ -11,32 +11,17 @@
       </div>
       <div class="top-right">
         <el-tabs v-model="activeTab" class="settings-tabs">
-          <el-tab-pane name="profile">
-            <template #label><span><el-icon><User /></el-icon> 个人设置</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="system">
-            <template #label><span><el-icon><Setting /></el-icon> 系统设置</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="docker">
-            <template #label><span><el-icon><Box /></el-icon> Docker设置</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="security">
-            <template #label><span><el-icon><Lock /></el-icon> 安全设置</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="network">
-            <template #label><span><el-icon><Connection /></el-icon> 网络设置</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="backup">
-            <template #label><span><el-icon><FolderOpened /></el-icon> 备份还原</span></template>
-          </el-tab-pane>
-          <el-tab-pane name="about">
-            <template #label><span><el-icon><InfoFilled /></el-icon> 关于</span></template>
-          </el-tab-pane>
+          <el-tab-pane name="profile"><template #label><span><el-icon><User /></el-icon> 个人设置</span></template></el-tab-pane>
+          <el-tab-pane name="system"><template #label><span><el-icon><Setting /></el-icon> 系统设置</span></template></el-tab-pane>
+          <el-tab-pane name="docker"><template #label><span><el-icon><Box /></el-icon> Docker设置</span></template></el-tab-pane>
+          <el-tab-pane name="security"><template #label><span><el-icon><Lock /></el-icon> 安全设置</span></template></el-tab-pane>
+          <el-tab-pane name="network"><template #label><span><el-icon><Connection /></el-icon> 网络设置</span></template></el-tab-pane>
+          <el-tab-pane name="backup"><template #label><span><el-icon><FolderOpened /></el-icon> 备份还原</span></template></el-tab-pane>
+          <el-tab-pane name="about"><template #label><span><el-icon><InfoFilled /></el-icon> 关于</span></template></el-tab-pane>
         </el-tabs>
       </div>
     </div>
 
-    <!-- 个人设置 -->
     <div class="content-panel" v-if="activeTab === 'profile'">
       <div class="settings-section">
         <h3 class="section-title">账号信息</h3>
@@ -63,10 +48,7 @@
           <el-form-item label="主题配色">
             <el-select v-model="uiSettings.theme" @change="changeTheme">
               <el-option label="浅色" value="light" />
-              <el-option label="暗色" value="dark" />
-              <el-option label="黑金" value="gold" />
-              <el-option label="深海蓝" value="blue" />
-              <el-option label="森林绿" value="green" />
+              <el-option label="DaVinci Resolve" value="davinci" />
             </el-select>
           </el-form-item>
           <el-form-item label="语言">
@@ -77,7 +59,6 @@
           </el-form-item>
           <el-form-item label="全局透明度">
             <el-slider v-model="uiSettings.opacity" :min="0" :max="100" :format-tooltip="formatOpacity" @change="changeOpacity" />
-            <div class="form-tip">调整面板整体透明度，数值越大越不透明（100%为完全不透明）</div>
           </el-form-item>
         </el-form>
       </div>
@@ -87,7 +68,6 @@
         <el-form label-width="120px" class="settings-form">
           <el-form-item label="自定义样式">
             <el-input v-model="uiSettings.customCSS" type="textarea" :rows="12" placeholder="/* 自定义 CSS 样式 */" />
-            <div class="form-tip">在这里编写自定义 CSS 样式，会实时生效</div>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="applyCustomCSS" :loading="applyingCSS">应用样式</el-button>
@@ -97,7 +77,6 @@
       </div>
     </div>
 
-    <!-- 系统设置 -->
     <div class="content-panel" v-if="activeTab === 'system'">
       <div class="settings-section">
         <h3 class="section-title">基础设置</h3>
@@ -108,12 +87,10 @@
       </div>
     </div>
 
-    <!-- Docker 设置 -->
     <div class="content-panel" v-if="activeTab === 'docker'">
       <DockerConfig />
     </div>
 
-    <!-- 安全设置 -->
     <div class="content-panel" v-if="activeTab === 'security'">
       <div class="settings-section">
         <h3 class="section-title">登录安全</h3>
@@ -124,7 +101,6 @@
       </div>
     </div>
 
-    <!-- 网络设置 -->
     <div class="content-panel" v-if="activeTab === 'network'">
       <div class="settings-section">
         <h3 class="section-title">代理设置</h3>
@@ -134,7 +110,6 @@
       </div>
     </div>
 
-    <!-- 备份还原 -->
     <div class="content-panel" v-if="activeTab === 'backup'">
       <div class="settings-section">
         <h3 class="section-title">数据备份</h3>
@@ -144,7 +119,6 @@
       </div>
     </div>
 
-    <!-- 关于 -->
     <div class="content-panel" v-if="activeTab === 'about'">
       <div class="about-section">
         <div class="about-logo"><h1 class="logo">UPanel</h1><p class="slogan">轻量级容器管理面板</p></div>
@@ -172,10 +146,22 @@ const passwordFormRef = ref(null)
 
 const profileForm = reactive({ username: 'admin', email: '', phone: '' })
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
-const uiSettings = reactive({ theme: 'light', language: 'zh-CN', customCSS: '', opacity: 85 })
 const systemForm = reactive({ panelName: 'UPanel', port: 8080 })
 const securityForm = reactive({ loginLimit: true, maxAttempts: 5 })
 const networkForm = reactive({ httpProxy: '' })
+
+// 从 localStorage 读取主题
+const getSavedTheme = () => {
+  const saved = localStorage.getItem('theme')
+  return saved === 'davinci' ? 'davinci' : 'light'
+}
+
+const uiSettings = reactive({ 
+  theme: getSavedTheme(), 
+  language: 'zh-CN', 
+  customCSS: '', 
+  opacity: 85 
+})
 
 const passwordRules = {
   oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
@@ -200,16 +186,7 @@ const applyOpacity = (opacity) => {
     .app-card, .website-card {
       background-color: rgba(255, 255, 255, ${value}) !important;
     }
-    body.dark-mode .el-card, body.dark-mode .stats-panel, body.dark-mode .gauges-panel,
-    body.dark-mode .chart-panel, body.dark-mode .info-panel, body.dark-mode .notification-panel,
-    body.dark-mode .apps-panel, body.dark-mode .files-panel, body.dark-mode .websites-panel,
-    body.dark-mode .databases-panel, body.dark-mode .containers-panel,
-    body.dark-mode .content-panel, body.dark-mode .categories-panel,
-    body.dark-mode .top-panel, body.dark-mode .breadcrumb-panel {
-      background-color: rgba(30, 30, 30, ${value}) !important;
-    }
     .sidebar { background-color: rgba(255, 255, 255, ${Math.min(value + 0.05, 1)}) !important; }
-    body.dark-mode .sidebar { background-color: rgba(30, 30, 30, ${Math.min(value + 0.05, 1)}) !important; }
   `
   document.head.appendChild(style)
   localStorage.setItem('panelOpacity', opacity)
@@ -268,7 +245,8 @@ const resetCustomCSS = () => {
 
 const changeTheme = (theme) => {
   applyTheme(theme)
-  ElMessage.success(`已切换到${theme === 'light' ? '浅色' : theme === 'dark' ? '暗色' : theme === 'gold' ? '黑金' : theme === 'blue' ? '深海蓝' : '森林绿'}主题`)
+  const themeName = theme === 'light' ? '浅色' : 'DaVinci Resolve'
+  ElMessage.success(`已切换到${themeName}主题`)
 }
 
 const saveAllSettings = async () => {
@@ -301,6 +279,15 @@ const manualBackup = async () => {
 onMounted(() => {
   loadOpacity()
   loadCustomCSS()
+  // 确保主题已应用
+  const savedTheme = localStorage.getItem('theme')
+  if (savedTheme === 'davinci') {
+    applyTheme('davinci')
+    uiSettings.theme = 'davinci'
+  } else {
+    applyTheme('light')
+    uiSettings.theme = 'light'
+  }
 })
 </script>
 
@@ -323,7 +310,7 @@ onMounted(() => {
 .info-row { display: flex; gap: 40px; padding: 8px 0; }
 .info-row .label { color: #9ca3af; width: 80px; }
 .info-row .value { color: #1f2937; font-weight: 500; }
-.about-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 32px; }
+.about-links { display: flex; justify-content: center; gap: 24px; }
 .about-links a { color: #477779; text-decoration: none; }
 .about-copyright { font-size: 12px; color: #9ca3af; }
 .el-slider { width: 300px; }

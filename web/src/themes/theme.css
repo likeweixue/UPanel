@@ -52,14 +52,6 @@ body {
   background-color: var(--theme-primary) !important;
 }
 
-.menu-item:hover {
-  background-color: var(--theme-border) !important;
-}
-
-.submenu-item.active {
-  background-color: var(--theme-primary-light) !important;
-}
-
 .el-button--primary {
   background-color: var(--theme-primary) !important;
   border-color: var(--theme-primary) !important;
@@ -84,4 +76,589 @@ body {
 
 .el-switch.is-checked .el-switch__core {
   background-color: var(--theme-primary) !important;
+}
+
+/* ============================================
+   DaVinci Resolve 主题专用样式
+   ============================================ */
+body.theme-davinci {
+  --theme-primary: #b83b3b;
+  --theme-primary-light: #c44a4a;
+  --theme-primary-dark: #a03030;
+  --theme-bg: #1a1a1a;
+  --theme-card-bg: #2a2a2a;
+  --theme-text: #e0e0e0;
+  --theme-text-secondary: #a0a0a0;
+  --theme-border: #3a3a3a;
+  background-color: #1a1a1a !important;
+}
+
+/* 达芬奇主题下额外样式 */
+body.theme-davinci .el-input__wrapper {
+  background-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-table__header th {
+  background-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-table td {
+  border-bottom-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-dialog,
+body.theme-davinci .el-drawer {
+  background-color: #2a2a2a !important;
+}
+
+body.theme-davinci .section-title {
+  border-left-color: #b83b3b !important;
+}
+
+/* ============================================
+   DaVinci Resolve 主题 - 完全暗色覆盖
+   ============================================ */
+
+body.theme-davinci,
+body.theme-davinci .app-container,
+body.theme-davinci .main-area,
+body.theme-davinci .sidebar,
+body.theme-davinci .top-bar,
+body.theme-davinci .footer,
+body.theme-davinci .content-area,
+body.theme-davinci .settings-container,
+body.theme-davinci .content-panel,
+body.theme-davinci .settings-section,
+body.theme-davinci .stats-panel,
+body.theme-davinci .gauges-panel,
+body.theme-davinci .chart-panel,
+body.theme-davinci .info-panel,
+body.theme-davinci .notification-panel,
+body.theme-davinci .apps-panel,
+body.theme-davinci .files-panel,
+body.theme-davinci .websites-panel,
+body.theme-davinci .databases-panel,
+body.theme-davinci .containers-panel,
+body.theme-davinci .categories-panel,
+body.theme-davinci .top-panel,
+body.theme-davinci .breadcrumb-panel,
+body.theme-davinci .process-card,
+body.theme-davinci .chart-card,
+body.theme-davinci .app-card,
+body.theme-davinci .website-card {
+  background-color: #1a1a1a !important;
+  background: #1a1a1a !important;
+}
+
+/* 卡片背景 - 稍亮一点用于区分层次 */
+body.theme-davinci .stats-panel,
+body.theme-davinci .gauges-panel,
+body.theme-davinci .chart-panel,
+body.theme-davinci .info-panel,
+body.theme-davinci .notification-panel,
+body.theme-davinci .apps-panel,
+body.theme-davinci .files-panel,
+body.theme-davinci .websites-panel,
+body.theme-davinci .databases-panel,
+body.theme-davinci .containers-panel,
+body.theme-davinci .content-panel,
+body.theme-davinci .categories-panel,
+body.theme-davinci .top-panel,
+body.theme-davinci .breadcrumb-panel,
+body.theme-davinci .process-card,
+body.theme-davinci .chart-card,
+body.theme-davinci .app-card,
+body.theme-davinci .website-card {
+  background-color: #2a2a2a !important;
+}
+
+/* 侧边栏 */
+body.theme-davinci .sidebar {
+  background-color: #1e1e1e !important;
+  border-right-color: #3a3a3a !important;
+}
+
+/* 顶部栏和底部栏 */
+body.theme-davinci .top-bar,
+body.theme-davinci .footer {
+  background-color: #1e1e1e !important;
+  border-color: #3a3a3a !important;
+}
+
+/* 所有文字颜色 */
+body.theme-davinci,
+body.theme-davinci .page-title,
+body.theme-davinci .panel-title,
+body.theme-davinci .section-title,
+body.theme-davinci .stat-number,
+body.theme-davinci .app-name,
+body.theme-davinci .domain-name,
+body.theme-davinci .status-value,
+body.theme-davinci .info-value,
+body.theme-davinci .remark-cell,
+body.theme-davinci .menu-text,
+body.theme-davinci .logo,
+body.theme-davinci .user-name,
+body.theme-davinci .breadcrumb-item,
+body.theme-davinci .folder-link,
+body.theme-davinci .path-link {
+  color: #e0e0e0 !important;
+}
+
+/* 次要文字 */
+body.theme-davinci .stat-label,
+body.theme-davinci .gauge-label,
+body.theme-davinci .info-label,
+body.theme-davinci .status-label,
+body.theme-davinci .form-tip,
+body.theme-davinci .app-description,
+body.theme-davinci .notice-time,
+body.theme-davinci .path-info {
+  color: #a0a0a0 !important;
+}
+
+/* 表格 */
+body.theme-davinci .el-table {
+  background-color: #2a2a2a !important;
+  color: #e0e0e0 !important;
+}
+
+body.theme-davinci .el-table__header th {
+  background-color: #3a3a3a !important;
+  color: #e0e0e0 !important;
+  border-bottom-color: #4a4a4a !important;
+}
+
+body.theme-davinci .el-table__body tr {
+  background-color: #2a2a2a !important;
+}
+
+body.theme-davinci .el-table__body tr:hover > td {
+  background-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-table td {
+  border-bottom-color: #3a3a3a !important;
+  color: #e0e0e0 !important;
+}
+
+/* 输入框 */
+body.theme-davinci .el-input__wrapper {
+  background-color: #3a3a3a !important;
+  box-shadow: 0 0 0 1px #4a4a4a inset !important;
+}
+
+body.theme-davinci .el-input__inner {
+  color: #e0e0e0 !important;
+}
+
+body.theme-davinci .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #b83b3b inset !important;
+}
+
+/* 文本域 */
+body.theme-davinci .el-textarea__inner {
+  background-color: #3a3a3a !important;
+  border-color: #4a4a4a !important;
+  color: #e0e0e0 !important;
+}
+
+/* 下拉框 */
+body.theme-davinci .el-select-dropdown {
+  background-color: #2a2a2a !important;
+}
+
+body.theme-davinci .el-select-dropdown__item {
+  color: #e0e0e0 !important;
+}
+
+body.theme-davinci .el-select-dropdown__item:hover {
+  background-color: #3a3a3a !important;
+  color: #b83b3b !important;
+}
+
+/* 按钮 */
+body.theme-davinci .el-button--default {
+  background-color: #3a3a3a !important;
+  border-color: #4a4a4a !important;
+  color: #e0e0e0 !important;
+}
+
+body.theme-davinci .el-button--default:hover {
+  background-color: #4a4a4a !important;
+  border-color: #b83b3b !important;
+}
+
+/* 主按钮 */
+body.theme-davinci .el-button--primary {
+  background-color: #b83b3b !important;
+  border-color: #b83b3b !important;
+  color: white !important;
+}
+
+body.theme-davinci .el-button--primary:hover {
+  background-color: #c44a4a !important;
+}
+
+/* 危险按钮 */
+body.theme-davinci .el-button--danger {
+  background-color: #a03030 !important;
+  border-color: #a03030 !important;
+}
+
+body.theme-davinci .el-button--danger:hover {
+  background-color: #b83b3b !important;
+}
+
+/* 分类标签 */
+body.theme-davinci .category-item {
+  color: #a0a0a0 !important;
+}
+
+body.theme-davinci .category-item:hover {
+  background-color: #3a3a3a !important;
+  color: #b83b3b !important;
+}
+
+body.theme-davinci .category-item.active {
+  background-color: #b83b3b !important;
+  color: white !important;
+}
+
+/* 分割线 */
+body.theme-davinci .stat-divider,
+body.theme-davinci .category-divider {
+  background-color: #3a3a3a !important;
+}
+
+/* 圆环背景 */
+body.theme-davinci .gauge-bg {
+  stroke: #3a3a3a !important;
+}
+
+/* 圆环填充 */
+body.theme-davinci .gauge-fill {
+  stroke: #b83b3b !important;
+}
+
+/* 图表容器 */
+body.theme-davinci .chart-container {
+  background-color: #2a2a2a !important;
+}
+
+/* 对话框 */
+body.theme-davinci .el-dialog,
+body.theme-davinci .el-drawer {
+  background-color: #2a2a2a !important;
+}
+
+body.theme-davinci .el-dialog__title,
+body.theme-davinci .el-drawer__title {
+  color: #e0e0e0 !important;
+}
+
+body.theme-davinci .el-dialog__header,
+body.theme-davinci .el-drawer__header {
+  border-bottom-color: #3a3a3a !important;
+}
+
+/* 消息提示 */
+body.theme-davinci .el-message {
+  background-color: #2a2a2a !important;
+  border-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-message__content {
+  color: #e0e0e0 !important;
+}
+
+/* 标签页 */
+body.theme-davinci .el-tabs__item {
+  color: #a0a0a0 !important;
+}
+
+body.theme-davinci .el-tabs__item.is-active {
+  color: #b83b3b !important;
+}
+
+body.theme-davinci .el-tabs__active-bar {
+  background-color: #b83b3b !important;
+}
+
+/* 开关 */
+body.theme-davinci .el-switch__core {
+  background-color: #3a3a3a !important;
+}
+
+body.theme-davinci .el-switch.is-checked .el-switch__core {
+  background-color: #b83b3b !important;
+}
+
+/* 复选框 */
+body.theme-davinci .el-checkbox__inner {
+  background-color: #3a3a3a !important;
+  border-color: #4a4a4a !important;
+}
+
+body.theme-davinci .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #b83b3b !important;
+  border-color: #b83b3b !important;
+}
+
+body.theme-davinci .el-checkbox__label {
+  color: #e0e0e0 !important;
+}
+
+/* 单选框 */
+body.theme-davinci .el-radio__inner {
+  background-color: #3a3a3a !important;
+  border-color: #4a4a4a !important;
+}
+
+body.theme-davinci .el-radio__input.is-checked .el-radio__inner {
+  background-color: #b83b3b !important;
+  border-color: #b83b3b !important;
+}
+
+body.theme-davinci .el-radio__label {
+  color: #e0e0e0 !important;
+}
+
+/* 面包屑 */
+body.theme-davinci .breadcrumb-item {
+  color: #a0a0a0 !important;
+}
+
+body.theme-davinci .breadcrumb-item:hover {
+  color: #b83b3b !important;
+}
+
+body.theme-davinci .breadcrumb-item.active {
+  color: #b83b3b !important;
+}
+
+/* 文件夹链接 */
+body.theme-davinci .folder-link {
+  color: #b83b3b !important;
+}
+
+body.theme-davinci .folder-link:hover {
+  color: #c44a4a !important;
+}
+
+/* ============================================
+   DaVinci Resolve 主题 - 字体颜色优化
+   ============================================ */
+
+/* 主要文字颜色 - 白色/浅灰色 */
+body.theme-davinci,
+body.theme-davinci .page-title,
+body.theme-davinci .panel-title,
+body.theme-davinci .stat-number,
+body.theme-davinci .app-name,
+body.theme-davinci .domain-name,
+body.theme-davinci .status-value,
+body.theme-davinci .info-value,
+body.theme-davinci .menu-text,
+body.theme-davinci .logo {
+  color: #e8e8e8 !important;
+}
+
+/* 重要/强调文字 - 红橙色（达芬奇标志色） */
+body.theme-davinci .menu-item.active .menu-text,
+body.theme-davinci .menu-item.active .menu-icon,
+body.theme-davinci .el-tabs__item.is-active,
+body.theme-davinci .category-item.active,
+body.theme-davinci .stat-number,
+body.theme-davinci .gauge-fill,
+body.theme-davinci .el-button--primary,
+body.theme-davinci .el-link.el-link--primary,
+body.theme-davinci .folder-link,
+body.theme-davinci .path-link,
+body.theme-davinci .remark-cell:hover,
+body.theme-davinci .submenu-item.active,
+body.theme-davinci .submenu-item:hover {
+  color: #e67e22 !important;
+}
+
+/* 统计卡片中的数字 */
+body.theme-davinci .stat-number {
+  color: #e67e22 !important;
+  font-weight: 700 !important;
+}
+
+/* 系统通知文字 - 修复看不清的问题 */
+body.theme-davinci .notice-title,
+body.theme-davinci .todo-item .el-checkbox__label,
+body.theme-davinci .notification-content,
+body.theme-davinci .notice-list,
+body.theme-davinci .todo-list {
+  color: #c0c0c0 !important;
+}
+
+body.theme-davinci .notice-title {
+  color: #e0e0e0 !important;
+  font-weight: 500 !important;
+}
+
+body.theme-davinci .notice-time {
+  color: #888888 !important;
+}
+
+/* 圆环内的百分比文字 */
+body.theme-davinci .gauge-percent {
+  color: #e67e22 !important;
+  font-weight: 700 !important;
+}
+
+/* 卡片标题边框 */
+body.theme-davinci .section-title {
+  border-left-color: #e67e22 !important;
+}
+
+/* 表格重要数据 */
+body.theme-davinci .el-table .cell {
+  color: #c0c0c0 !important;
+}
+
+body.theme-davinci .el-table .status-value {
+  color: #e67e22 !important;
+}
+
+/* 面包屑当前项 */
+body.theme-davinci .breadcrumb-item.active {
+  color: #e67e22 !important;
+}
+
+/* 按钮文字 */
+body.theme-davinci .el-button--primary span {
+  color: white !important;
+}
+
+/* 输入框聚焦边框 */
+body.theme-davinci .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #e67e22 inset !important;
+}
+
+/* 开关选中状态 */
+body.theme-davinci .el-switch.is-checked .el-switch__core {
+  background-color: #e67e22 !important;
+}
+
+/* 复选框选中状态 */
+body.theme-davinci .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #e67e22 !important;
+  border-color: #e67e22 !important;
+}
+
+/* 单选框选中状态 */
+body.theme-davinci .el-radio__input.is-checked .el-radio__inner {
+  background-color: #e67e22 !important;
+  border-color: #e67e22 !important;
+}
+
+/* 标签页悬停 */
+body.theme-davinci .el-tabs__item:hover {
+  color: #e67e22 !important;
+}
+
+/* 菜单项悬浮 */
+body.theme-davinci .menu-item:hover .menu-text,
+body.theme-davinci .menu-item:hover .menu-icon {
+  color: #e67e22 !important;
+}
+
+/* 分类标签悬浮/选中 */
+body.theme-davinci .category-item:hover {
+  color: #e67e22 !important;
+}
+
+body.theme-davinci .category-item.active {
+  background-color: #e67e22 !important;
+  color: white !important;
+}
+
+/* ============================================
+   DaVinci Resolve 主题 - 橙红色调
+   ============================================ */
+
+/* 主要强调色 - 橙红色 #e67e22 */
+body.theme-davinci .menu-item.active .menu-text,
+body.theme-davinci .menu-item.active .menu-icon,
+body.theme-davinci .el-tabs__item.is-active,
+body.theme-davinci .category-item.active,
+body.theme-davinci .stat-number,
+body.theme-davinci .gauge-fill,
+body.theme-davinci .el-button--primary,
+body.theme-davinci .el-link.el-link--primary,
+body.theme-davinci .folder-link,
+body.theme-davinci .path-link,
+body.theme-davinci .submenu-item.active,
+body.theme-davinci .breadcrumb-item.active,
+body.theme-davinci .el-tabs__item:hover,
+body.theme-davinci .menu-item:hover .menu-text,
+body.theme-davinci .category-item:hover {
+  color: #e67e22 !important;
+}
+
+/* 统计卡片数字 */
+body.theme-davinci .stat-number {
+  color: #e67e22 !important;
+}
+
+/* 圆环百分比 */
+body.theme-davinci .gauge-percent {
+  color: #e67e22 !important;
+}
+
+/* 卡片标题边框 */
+body.theme-davinci .section-title {
+  border-left-color: #e67e22 !important;
+}
+
+/* 主按钮背景 */
+body.theme-davinci .el-button--primary {
+  background-color: #e67e22 !important;
+  border-color: #e67e22 !important;
+}
+
+body.theme-davinci .el-button--primary:hover {
+  background-color: #f39c12 !important;
+}
+
+/* 标签页激活条 */
+body.theme-davinci .el-tabs__active-bar {
+  background-color: #e67e22 !important;
+}
+
+/* 开关选中状态 */
+body.theme-davinci .el-switch.is-checked .el-switch__core {
+  background-color: #e67e22 !important;
+}
+
+/* 复选框选中状态 */
+body.theme-davinci .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #e67e22 !important;
+  border-color: #e67e22 !important;
+}
+
+/* 单选框选中状态 */
+body.theme-davinci .el-radio__input.is-checked .el-radio__inner {
+  background-color: #e67e22 !important;
+  border-color: #e67e22 !important;
+}
+
+/* 输入框聚焦边框 */
+body.theme-davinci .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #e67e22 inset !important;
+}
+
+/* 下拉框选中项 */
+body.theme-davinci .el-select-dropdown__item.selected {
+  color: #e67e22 !important;
+}
+
+/* 分类标签激活项背景 */
+body.theme-davinci .category-item.active {
+  background-color: #e67e22 !important;
 }

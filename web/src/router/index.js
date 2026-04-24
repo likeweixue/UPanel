@@ -53,3 +53,13 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
+
+// 在路由守卫中重新应用主题
+router.afterEach(() => {
+  const saved = localStorage.getItem('theme')
+  if (saved === 'davinci') {
+    import('@/themes').then(({ applyTheme }) => {
+      applyTheme('davinci')
+    })
+  }
+})
