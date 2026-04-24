@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 )
 
-var version = "v0.1.4"
+var version = "v0.1.5"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -70,7 +68,6 @@ func printHelp() {
 	fmt.Println("  up 9 username 用户名         修改面板用户")
 	fmt.Println("  up 9 password 密码           修改面板密码")
 	fmt.Println("  up 9 port 端口号             修改面板端口")
-	fmt.Println("  up 9 entry 安全入口          修改安全入口")
 	fmt.Println("")
 }
 
@@ -181,14 +178,8 @@ func modifySystem(subcmd string) {
 		fmt.Scanln(&newPort)
 		fmt.Printf("✓ 端口已修改为: %d\n", newPort)
 		restartService()
-	case "entry":
-		fmt.Print("请输入安全入口 (如: mysecret): ")
-		var newEntry string
-		fmt.Scanln(&newEntry)
-		fmt.Printf("✓ 安全入口已设置为: %s\n", newEntry)
-		restartService()
 	default:
-		fmt.Println("可用: username, password, port, entry")
+		fmt.Println("可用: username, password, port")
 	}
 }
 
@@ -205,7 +196,5 @@ func resetSystem() {
 }
 
 func restoreData() {
-	fmt.Println("恢复服务及数据")
-	fmt.Println("请上传备份文件到 /opt/upanel/backup 目录")
-	fmt.Println("功能开发中...")
+	fmt.Println("恢复服务及数据功能开发中...")
 }
