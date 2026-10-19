@@ -7,52 +7,33 @@ import (
 	"upanel/internal/service"
 )
 
+// SettingsHandler 系统设置接口
 type SettingsHandler struct {
 	service *service.SettingsService
 }
 
+// NewSettingsHandler 创建设置处理器
 func NewSettingsHandler() *SettingsHandler {
-	return &SettingsHandler{
-		service: service.NewSettingsService(),
-	}
+	return &SettingsHandler{service: service.NewSettingsService()}
 }
 
-// 获取所有设置
+// GetAll 获取所有设置
 func (h *SettingsHandler) GetAll(c *gin.Context) {
-	settings := h.service.GetAll()
-	c.JSON(http.StatusOK, gin.H{"data": settings})
+	c.JSON(http.StatusOK, gin.H{"data": h.service.GetAll()})
 }
 
-// 更新设置
+// Update 更新设置
 func (h *SettingsHandler) Update(c *gin.Context) {
-	var updates map[string]interface{}
-	if err := c.ShouldBindJSON(&updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var patch service.Settings
+	if err := c.ShouldBindJSON(&patch); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数有误: " + err.Error()})
 		return
 	}
-	
-	// 处理各种设置
-	if mirrors, ok := updates["registry_mirrors"].([]interface{}); ok {
-		var strMirrors []string
-		for _, m := range mirrors {
-			if s, ok := m.(string); ok {
-				strMirrors = append(strMirrors, s)
-			}
-		}
-		h.service.SetRegistryMirrors(strMirrors)
+
+	if err := h.service.Update(&patch); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-	
-	if theme, ok := updates["theme"].(string); ok {
-		h.service.SetTheme(theme)
-	}
-	
-	if websitePath, ok := updates["website_path"].(string); ok {
-		h.service.SetWebsitePath(websitePath)
-	}
-	
-	if databasePath, ok := updates["database_path"].(string); ok {
-		h.service.SetDatabasePath(databasePath)
-	}
-	
-	c.JSON(http.StatusOK, gin.H{"message": "设置已更新"})
+
+	c.JSON(http.StatusOK, gin.H{"message": "设置已更新", "data": h.service.GetAll()})
 }

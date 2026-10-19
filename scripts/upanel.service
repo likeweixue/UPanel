@@ -1,7 +1,8 @@
 [Unit]
-Description=UPanel Service
-After=network.target docker.service
-Requires=docker.service
+Description=UPanel - Lightweight Docker Management Panel
+Documentation=https://github.com/upanel/upanel
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -9,8 +10,10 @@ User=root
 WorkingDirectory=/opt/upanel
 ExecStart=/opt/upanel/bin/upanel
 Restart=always
-RestartSec=10
-Environment="STATIC_PATH=/opt/upanel/web"
+RestartSec=5
+LimitNOFILE=65535
+Environment="UPANEL_BASE_DIR=/opt/upanel"
+Environment="GIN_MODE=release"
 
 [Install]
 WantedBy=multi-user.target

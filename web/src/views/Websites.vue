@@ -1,30 +1,62 @@
 <template>
   <div class="websites-container">
+    <!-- 网关状态条 -->
+    <div class="gateway-bar">
+      <div class="gw-left">
+        <span class="gw-title">网站网关</span>
+        <span class="status-badge" :class="gateway.state === 'running' ? 'running' : 'stopped'">
+          {{ gatewayStateText }}
+        </span>
+        <span class="gw-meta">容器 {{ gateway.container }} · HTTP {{ gateway.httpPort }}</span>
+      </div>
+      <div class="gw-right">
+        <el-button size="small" @click="refreshAll">
+          <el-icon><Refresh /></el-icon> 刷新
+        </el-button>
+        <el-button size="small" type="primary" plain @click="fixGateway" :loading="fixingGateway">
+          修复网关
+        </el-button>
+      </div>
+    </div>
+
+    <el-alert
+      v-if="gateway.state !== 'running'"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="网关未运行"
+      description="网站通过统一网关对外提供 80/443 服务。请点击「修复网关」，它会拉取镜像并启动容器；若端口被占用，请在「面板设置」中更换网关端口。"
+      style="margin-bottom: 4px"
+    />
+
     <!-- 顶部分类面板 -->
     <div class="top-panel">
       <div class="top-left">
-        <el-button type="primary" @click="openCreateDrawer">
+        <el-button type="primary" size="small" @click="openCreateDrawer">
           <el-icon><Plus /></el-icon> 创建网站
         </el-button>
-        <el-button 
-          v-if="selectedRows.length > 0" 
-          type="danger" 
+        <el-button
+          v-if="selectedRows.length > 0"
+          type="danger"
+          size="small"
           plain
           @click="batchDelete"
         >
           批量删除 ({{ selectedRows.length }})
         </el-button>
-        <el-button 
-          v-if="selectedRows.length > 0" 
-          type="success" 
+        <el-button
+          v-if="selectedRows.length > 0"
+          type="success"
+          size="small"
           plain
           @click="batchStart"
         >
           批量启动
         </el-button>
-        <el-button 
-          v-if="selectedRows.length > 0" 
-          type="warning" 
+        <el-button
+          v-if="selectedRows.length > 0"
+          type="warning"
+          size="small"
           plain
           @click="batchStop"
         >
@@ -32,61 +64,75 @@
         </el-button>
       </div>
       <div class="top-right">
-        <el-input 
-          v-model="searchKeyword" 
-          placeholder="搜索网站" 
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索域名"
           prefix-icon="Search"
           clearable
           style="width: 200px"
+          size="small"
         />
       </div>
     </div>
 
     <!-- 网站表格 -->
     <div class="websites-panel">
-      <el-table 
-        :data="filteredWebsites" 
-        
+      <el-table
+        v-loading="loading"
+        :data="filteredWebsites"
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="domain" label="域名" min-width="180" />
-        <el-table-column prop="phpVersion" label="类型" width="100">
+        <el-table-column prop="domain" label="域名" min-width="180">
           <template #default="{ row }">
-            <el-tag size="small">PHP {{ row.phpVersion }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="目录" width="100">
-          <template #default="{ row }">
-            <div class="folder-link" @click="openDirectory(row)" style="cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
-              <el-icon><Folder /></el-icon>
-              
+            <div class="domain-cell">
+              <span>{{ row.domain }}</span>
+              <el-tag v-if="row.aliases && row.aliases.length" size="small" type="info">
+                +{{ row.aliases.length }}
+              </el-tag>
+              <el-tag v-if="row.sslEnabled" size="small" type="success">SSL</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+
+        <el-table-column label="类型" width="130">
+          <template #default="{ row }">
+            <el-tag size="small" :type="typeTagType(row.type)">
+              {{ typeLabel(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="根目录" min-width="200">
+          <template #default="{ row }">
+            <div class="path-cell">
+              <span class="path-text">{{ row.rootDir }}</span>
+              <el-icon class="copy-icon" @click="copyText(row.rootDir)"><DocumentCopy /></el-icon>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <span class="status-badge" :class="row.status">
               {{ row.status === 'running' ? '运行中' : '已停止' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="150">
+
+        <el-table-column prop="remark" label="备注" min-width="140">
           <template #default="{ row }">
-            <span 
-              class="remark-cell" 
-              :class="{ 'remark-placeholder': !row.remark }"
-              @click="editRemark(row)"
-            >
+            <span class="remark-cell" :class="{ 'remark-placeholder': !row.remark }" @click="openEditDrawer(row)">
               {{ row.remark || '点击添加备注' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
-            <el-button 
-              size="small" 
+            <el-button
+              size="small"
               :type="row.status === 'running' ? 'warning' : 'success'"
               @click="toggleWebsite(row)"
             >
@@ -102,68 +148,85 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                  <el-dropdown-item command="config">配置文件</el-dropdown-item>
-                  <el-dropdown-item command="logs">访问日志</el-dropdown-item>
-                  <el-dropdown-item command="backup">备份</el-dropdown-item>
+                  <el-dropdown-item command="ssl">SSL 证书</el-dropdown-item>
+                  <el-dropdown-item command="restart">重启</el-dropdown-item>
                   <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
           </template>
         </el-table-column>
+
+        <template #empty>
+          <div class="empty-tip">暂无网站，点击「创建网站」开始部署</div>
+        </template>
       </el-table>
     </div>
 
     <!-- 创建网站抽屉 -->
-    <el-drawer
-      v-model="createDrawerVisible"
-      title="创建网站"
-      direction="rtl"
-      size="450px"
-    >
+    <el-drawer v-model="createDrawerVisible" title="创建网站" direction="rtl" size="460px">
       <div class="drawer-content">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="域名请先解析到本机 IP"
+          description="创建后把网页文件上传到站点根目录即可访问。"
+          style="margin-bottom: 16px"
+        />
         <el-form :model="createForm" label-width="100px" label-position="left">
           <el-form-item label="域名" required>
             <el-input v-model="createForm.domain" placeholder="例如: example.com" />
-            <div class="form-tip">支持多级域名，如 test.example.com</div>
           </el-form-item>
 
-          <el-form-item label="PHP版本">
-            <el-select v-model="createForm.phpVersion" placeholder="请选择PHP版本">
+          <el-form-item label="其他域名">
+            <el-select
+              v-model="createForm.aliases"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="回车添加，如 www.example.com"
+              style="width: 100%"
+            />
+          </el-form-item>
+
+          <el-form-item label="网站类型" required>
+            <el-radio-group v-model="createForm.type">
+              <el-radio-button value="static">静态</el-radio-button>
+              <el-radio-button value="php">PHP</el-radio-button>
+              <el-radio-button value="proxy">反向代理</el-radio-button>
+            </el-radio-group>
+            <div class="form-tip">{{ typeTip }}</div>
+          </el-form-item>
+
+          <el-form-item v-if="createForm.type === 'php'" label="PHP 版本">
+            <el-select v-model="createForm.phpVersion" style="width: 100%">
+              <el-option label="PHP 8.3" value="8.3" />
               <el-option label="PHP 8.2" value="8.2" />
               <el-option label="PHP 8.1" value="8.1" />
               <el-option label="PHP 8.0" value="8.0" />
               <el-option label="PHP 7.4" value="7.4" />
-              <el-option label="PHP 7.3" value="7.3" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="数据库">
-            <el-switch v-model="createForm.createDatabase" />
-            <div class="form-tip" v-if="createForm.createDatabase">自动创建MySQL数据库</div>
-          </el-form-item>
-
-          <el-form-item label="数据库名" v-if="createForm.createDatabase">
-            <el-input v-model="createForm.databaseName" placeholder="留空则使用域名" />
-          </el-form-item>
-
-          <el-form-item label="数据库密码" v-if="createForm.createDatabase">
-            <el-input v-model="createForm.databasePassword" type="password" placeholder="留空则自动生成" />
-          </el-form-item>
+          <template v-if="createForm.type === 'proxy'">
+            <el-form-item label="镜像" required>
+              <el-input v-model="createForm.image" placeholder="例如: nginx:alpine" />
+            </el-form-item>
+            <el-form-item label="容器端口" required>
+              <el-input-number v-model="createForm.port" :min="1" :max="65535" />
+            </el-form-item>
+          </template>
 
           <el-form-item label="备注">
-            <el-input 
-              v-model="createForm.remark" 
-              type="textarea" 
-              :rows="3"
-              placeholder="可选，添加网站备注信息"
-            />
+            <el-input v-model="createForm.remark" type="textarea" :rows="2" placeholder="可选" />
           </el-form-item>
         </el-form>
 
         <div class="drawer-footer">
-          <el-button @click="createDrawerVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmCreate" :loading="creating">
+          <el-button size="small" @click="createDrawerVisible = false">取消</el-button>
+          <el-button size="small" type="primary" @click="confirmCreate" :loading="creating">
             创建
           </el-button>
         </div>
@@ -173,507 +236,476 @@
     <!-- 编辑网站抽屉 -->
     <el-drawer
       v-model="editDrawerVisible"
-      :title="`编辑网站 - ${currentEditSite?.domain}`"
+      :title="`编辑网站 - ${currentEditSite ? currentEditSite.domain : ''}`"
       direction="rtl"
-      size="600px"
+      size="460px"
     >
       <div class="drawer-content">
-        <el-tabs v-model="editActiveTab">
-          <el-tab-pane label="基础设置" name="basic">
-            <el-form :model="editForm" label-width="120px" label-position="left">
-              <el-form-item label="域名">
-                <el-input v-model="editForm.domain" placeholder="主域名" />
-              </el-form-item>
-              <el-form-item label="其他域名">
-                <el-select
-                  v-model="editForm.otherDomains"
-                  multiple
-                  filterable
-                  allow-create
-                  default-first-option
-                  placeholder="添加其他域名"
-                  style="width: 100%"
-                />
-              </el-form-item>
-              <el-form-item label="网站目录">
-                <el-input v-model="editForm.rootPath">
-                  <template #append>
-                    <el-button @click="browseDirectory">浏览</el-button>
-                  </template>
-                </el-input>
-              </el-form-item>
-              <el-form-item label="默认文档">
-                <el-input v-model="editForm.defaultIndex" placeholder="index.html,index.php" />
-              </el-form-item>
-              <el-form-item label="PHP版本">
-                <el-select v-model="editForm.phpVersion">
-                  <el-option label="PHP 8.2" value="8.2" />
-                  <el-option label="PHP 8.1" value="8.1" />
-                  <el-option label="PHP 8.0" value="8.0" />
-                  <el-option label="PHP 7.4" value="7.4" />
-                </el-select>
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="流量限制" name="traffic">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="带宽限制">
-                <el-input-number v-model="editForm.bandwidth" :min="0" /> MB/s
-              </el-form-item>
-              <el-form-item label="并发连接数">
-                <el-input-number v-model="editForm.maxConcurrent" :min="0" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="反向代理" name="proxy">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="启用代理">
-                <el-switch v-model="editForm.enableProxy" />
-              </el-form-item>
-              <el-form-item label="代理地址" v-if="editForm.enableProxy">
-                <el-input v-model="editForm.proxyUrl" placeholder="http://127.0.0.1:8080" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="安全设置" name="security">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="密码访问">
-                <el-switch v-model="editForm.passwordAuth" />
-              </el-form-item>
-              <el-form-item label="跨域访问">
-                <el-switch v-model="editForm.cors" />
-              </el-form-item>
-              <el-form-item label="防盗链">
-                <el-switch v-model="editForm.antiLeech" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="SSL证书" name="ssl">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="启用HTTPS">
-                <el-switch v-model="editForm.enableSSL" />
-              </el-form-item>
-              <el-form-item label="证书类型" v-if="editForm.enableSSL">
-                <el-radio-group v-model="editForm.sslType">
-                  <el-radio value="lets">Let's Encrypt</el-radio>
-                  <el-radio value="custom">自定义证书</el-radio>
-                </el-radio-group>
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="伪静态" name="rewrite">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="规则模板">
-                <el-select v-model="editForm.rewriteTemplate" placeholder="选择规则模板">
-                  <el-option label="WordPress" value="wordpress" />
-                  <el-option label="Discuz" value="discuz" />
-                  <el-option label="自定义" value="custom" />
-                </el-select>
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="负载均衡" name="loadBalance">
-            <el-form :model="editForm" label-width="120px">
-              <el-form-item label="启用负载均衡">
-                <el-switch v-model="editForm.enableLoadBalance" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-        </el-tabs>
-
-        <div class="drawer-footer">
-          <el-button @click="editDrawerVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveEdit" :loading="saving">
-            保存设置
-          </el-button>
-        </div>
-      </div>
-    </el-drawer>
-
-    <!-- 备份抽屉 -->
-    <el-drawer
-      v-model="backupDrawerVisible"
-      title="网站备份"
-      direction="rtl"
-      size="400px"
-    >
-      <div class="drawer-content">
-        <div class="backup-info">
-          <div class="backup-site">{{ currentBackupSite?.domain }}</div>
-        </div>
-        
-        <el-form label-width="100px" label-position="left">
-          <el-form-item label="备份类型">
-            <el-radio-group v-model="backupType">
-              <el-radio value="full">完整备份</el-radio>
-              <el-radio value="files">仅文件</el-radio>
-              <el-radio value="database">仅数据库</el-radio>
-            </el-radio-group>
+        <el-form :model="editForm" label-width="110px" label-position="left">
+          <el-form-item label="主域名">
+            <el-input v-model="editForm.domain" disabled />
           </el-form-item>
 
-          <el-form-item label="备份名称">
-            <el-input v-model="backupName" placeholder="留空则自动生成" />
+          <el-form-item label="其他域名">
+            <el-select
+              v-model="editForm.aliases"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="回车添加"
+              style="width: 100%"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="editForm.type === 'php'" label="PHP 版本">
+            <el-select v-model="editForm.phpVersion" style="width: 100%">
+              <el-option label="PHP 8.3" value="8.3" />
+              <el-option label="PHP 8.2" value="8.2" />
+              <el-option label="PHP 8.1" value="8.1" />
+              <el-option label="PHP 8.0" value="8.0" />
+              <el-option label="PHP 7.4" value="7.4" />
+            </el-select>
+            <div class="form-tip">切换版本会重建 PHP 容器，站点文件不受影响</div>
+          </el-form-item>
+
+          <el-form-item v-if="editForm.type === 'proxy'" label="容器端口">
+            <el-input-number v-model="editForm.port" :min="1" :max="65535" />
+          </el-form-item>
+
+          <el-form-item label="根目录">
+            <el-input v-model="editForm.rootDir" disabled />
+          </el-form-item>
+
+          <el-form-item label="备注">
+            <el-input v-model="editForm.remark" type="textarea" :rows="2" />
           </el-form-item>
         </el-form>
 
         <div class="drawer-footer">
-          <el-button @click="backupDrawerVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmBackup" :loading="backingUp">
-            开始备份
-          </el-button>
+          <el-button size="small" @click="editDrawerVisible = false">取消</el-button>
+          <el-button size="small" type="primary" @click="confirmEdit" :loading="saving">保存</el-button>
         </div>
       </div>
     </el-drawer>
 
-    <!-- 备注编辑对话框 -->
-    <el-dialog v-model="remarkDialogVisible" title="编辑备注" width="400px">
-      <el-input 
-        v-model="editingRemark" 
-        type="textarea" 
-        :rows="4"
-        placeholder="请输入备注信息"
-      />
-      <template #footer>
-        <el-button @click="remarkDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveRemark">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- SSL 抽屉 -->
+    <el-drawer
+      v-model="sslDrawerVisible"
+      :title="`SSL 证书 - ${currentSslSite ? currentSslSite.domain : ''}`"
+      direction="rtl"
+      size="520px"
+    >
+      <div class="drawer-content">
+        <el-form label-width="120px" label-position="left">
+          <el-form-item label="证书 (PEM)">
+            <el-input
+              v-model="sslForm.fullchain"
+              type="textarea"
+              :rows="8"
+              placeholder="-----BEGIN CERTIFICATE----- ..."
+            />
+          </el-form-item>
+          <el-form-item label="私钥 (KEY)">
+            <el-input
+              v-model="sslForm.privkey"
+              type="textarea"
+              :rows="8"
+              placeholder="-----BEGIN PRIVATE KEY----- ..."
+            />
+          </el-form-item>
+          <el-form-item label="强制 HTTPS">
+            <el-switch v-model="sslForm.forceSSL" />
+          </el-form-item>
+        </el-form>
+
+        <div class="drawer-footer">
+          <el-button
+            v-if="currentSslSite && currentSslSite.sslEnabled"
+            size="small"
+            type="danger"
+            plain
+            @click="disableSSL"
+          >关闭 SSL</el-button>
+          <el-button size="small" @click="sslDrawerVisible = false">取消</el-button>
+          <el-button size="small" type="primary" @click="confirmSSL" :loading="sslSaving">部署</el-button>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Link, ArrowDown, Folder } from '@element-plus/icons-vue'
 
+const websites = ref([])
+const loading = ref(false)
 const searchKeyword = ref('')
-const createDrawerVisible = ref(false)
-const editDrawerVisible = ref(false)
-const backupDrawerVisible = ref(false)
-const creating = ref(false)
-const saving = ref(false)
-const backingUp = ref(false)
-const remarkDialogVisible = ref(false)
-const editingRemark = ref('')
-const currentWebsite = ref(null)
-const currentEditSite = ref(null)
-const currentBackupSite = ref(null)
 const selectedRows = ref([])
-const editActiveTab = ref('basic')
 
-const backupType = ref('full')
-const backupName = ref('')
-const backupRemark = ref('')
-const backupList = ref([])
+const gateway = reactive({ state: 'unknown', httpPort: '80', container: 'upanel-gateway' })
+const fixingGateway = ref(false)
 
-const editForm = ref({
-  domain: '',
-  otherDomains: [],
-  rootPath: '',
-  defaultIndex: 'index.html,index.php',
-  phpVersion: '8.2',
-  bandwidth: 0,
-  maxConcurrent: 0,
-  enableProxy: false,
-  proxyUrl: '',
-  proxyCache: false,
-  passwordAuth: false,
-  authUsername: '',
-  authPassword: '',
-  cors: false,
-  corsDomains: '*',
-  antiLeech: false,
-  antiLeechDomains: '',
-  enableSSL: false,
-  sslType: 'lets',
-  sslCert: '',
-  sslKey: '',
-  rewriteTemplate: '',
-  rewriteRules: '',
-  enableLoadBalance: false,
-  upstreamServers: []
-})
-
+// ---------- 创建 ----------
+const createDrawerVisible = ref(false)
+const creating = ref(false)
 const createForm = ref({
   domain: '',
+  aliases: [],
+  type: 'static',
   phpVersion: '8.2',
-  createDatabase: false,
-  databaseName: '',
-  databasePassword: '',
+  image: '',
+  port: 80,
   remark: ''
 })
 
-const websites = ref([
-  {
-    id: 1,
-    domain: 'example.com',
-    phpVersion: '8.2',
-    path: '/www/wwwroot/example.com',
-    status: 'running',
-    remark: '主站',
-    createdAt: '2024-01-15'
-  },
-  {
-    id: 2,
-    domain: 'test.local',
-    phpVersion: '8.1',
-    path: '/www/wwwroot/test.local',
-    status: 'stopped',
-    remark: '',
-    createdAt: '2024-01-20'
-  },
-  {
-    id: 3,
-    domain: 'blog.example.com',
-    phpVersion: '7.4',
-    path: '/www/wwwroot/blog.example.com',
-    status: 'running',
-    remark: '技术博客',
-    createdAt: '2024-02-01'
+const typeTip = computed(() => {
+  switch (createForm.value.type) {
+    case 'php':
+      return '启动 php-fpm 容器，网关通过 fastcgi 转发，适合 WordPress / Laravel 等'
+    case 'proxy':
+      return '启动指定镜像容器，网关反向代理到容器端口，适合 Node / Go / Java 应用'
+    default:
+      return '网关直接托管静态文件，不额外启动容器，最快最省资源'
   }
-])
+})
+
+const gatewayStateText = computed(() => {
+  switch (gateway.state) {
+    case 'running': return '运行中'
+    case 'not_installed': return '未安装'
+    case 'unknown': return '未知'
+    default: return gateway.state
+  }
+})
+
+// ---------- 编辑 ----------
+const editDrawerVisible = ref(false)
+const saving = ref(false)
+const currentEditSite = ref(null)
+const editForm = ref({ domain: '', aliases: [], phpVersion: '', port: 0, rootDir: '', remark: '', type: '' })
+
+// ---------- SSL ----------
+const sslDrawerVisible = ref(false)
+const sslSaving = ref(false)
+const currentSslSite = ref(null)
+const sslForm = ref({ fullchain: '', privkey: '', forceSSL: true })
 
 const filteredWebsites = computed(() => {
   if (!searchKeyword.value) return websites.value
-  return websites.value.filter(site => 
-    site.domain.toLowerCase().includes(searchKeyword.value.toLowerCase())
-  )
+  const kw = searchKeyword.value.toLowerCase()
+  return websites.value.filter(s => s.domain.toLowerCase().includes(kw))
 })
 
-const handleSelectionChange = (selection) => {
-  selectedRows.value = selection
+const typeLabel = (row) => {
+  if (row.type === 'php') return 'PHP ' + (row.phpVersion || '')
+  if (row.type === 'proxy') return '反向代理'
+  return '静态'
 }
 
-const batchDelete = async () => {
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 个网站吗？`, '警告', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-  
-  selectedRows.value.forEach(row => {
-    const index = websites.value.findIndex(w => w.id === row.id)
-    if (index !== -1) {
-      websites.value.splice(index, 1)
-    }
-  })
-  ElMessage.success('批量删除成功')
+const typeTagType = (t) => {
+  if (t === 'php') return 'warning'
+  if (t === 'proxy') return 'success'
+  return 'info'
 }
 
-const batchStart = async () => {
-  for (const row of selectedRows.value) {
-    if (row.status !== 'running') {
-      row.status = 'running'
-    }
+// 统一提取后端错误信息
+const errMsg = (err) => {
+  return (err && err.response && err.response.data && err.response.data.error) || err.message || '请求失败'
+}
+
+// ---------- 数据加载 ----------
+const loadWebsites = async () => {
+  loading.value = true
+  try {
+    const res = await axios.get('/api/websites/')
+    websites.value = (res.data && res.data.data) || []
+  } catch (err) {
+    ElMessage.error('加载网站列表失败: ' + errMsg(err))
+  } finally {
+    loading.value = false
   }
-  ElMessage.success(`已启动 ${selectedRows.value.length} 个网站`)
 }
 
-const batchStop = async () => {
-  for (const row of selectedRows.value) {
-    if (row.status === 'running') {
-      row.status = 'stopped'
-    }
+const loadGateway = async () => {
+  try {
+    const res = await axios.get('/api/gateway/status')
+    Object.assign(gateway, (res.data && res.data.data) || {})
+  } catch (err) {
+    gateway.state = 'unknown'
   }
-  ElMessage.success(`已停止 ${selectedRows.value.length} 个网站`)
 }
 
+const refreshAll = async () => {
+  await Promise.all([loadWebsites(), loadGateway()])
+}
+
+const fixGateway = async () => {
+  fixingGateway.value = true
+  try {
+    await axios.post('/api/gateway/ensure')
+    ElMessage.success('网关已就绪')
+  } catch (err) {
+    ElMessage.error('网关启动失败: ' + errMsg(err))
+  } finally {
+    fixingGateway.value = false
+    await loadGateway()
+  }
+}
+
+// ---------- 创建 ----------
 const openCreateDrawer = () => {
-  createForm.value = {
-    domain: '',
-    phpVersion: '8.2',
-    createDatabase: false,
-    databaseName: '',
-    databasePassword: '',
-    remark: ''
-  }
+  createForm.value = { domain: '', aliases: [], type: 'static', phpVersion: '8.2', image: '', port: 80, remark: '' }
   createDrawerVisible.value = true
 }
 
 const confirmCreate = async () => {
-  if (!createForm.value.domain) {
+  const f = createForm.value
+  if (!f.domain) {
     ElMessage.warning('请输入域名')
     return
   }
-  
+  if (f.type === 'proxy' && !f.image) {
+    ElMessage.warning('反代类型必须填写镜像名称')
+    return
+  }
+
   creating.value = true
   try {
-    const newWebsite = {
-      id: Date.now(),
-      domain: createForm.value.domain,
-      phpVersion: createForm.value.phpVersion,
-      path: `/www/wwwroot/${createForm.value.domain}`,
-      status: 'running',
-      remark: createForm.value.remark || '',
-      createdAt: new Date().toISOString().split('T')[0]
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    websites.value.unshift(newWebsite)
+    await axios.post('/api/websites/', {
+      domain: f.domain.trim(),
+      aliases: f.aliases || [],
+      type: f.type,
+      phpVersion: f.type === 'php' ? f.phpVersion : '',
+      image: f.type === 'proxy' ? f.image.trim() : '',
+      port: f.type === 'proxy' ? f.port : 0,
+      remark: f.remark
+    })
     ElMessage.success('网站创建成功')
     createDrawerVisible.value = false
+    await refreshAll()
   } catch (err) {
-    ElMessage.error('创建失败: ' + err.message)
+    ElMessage.error('创建失败: ' + errMsg(err))
   } finally {
     creating.value = false
   }
 }
 
-const openEditDrawer = (website) => {
-  currentEditSite.value = website
-  editForm.value = {
-    domain: website.domain,
-    otherDomains: [],
-    rootPath: website.path,
-    defaultIndex: 'index.html,index.php',
-    phpVersion: website.phpVersion,
-    bandwidth: 0,
-    maxConcurrent: 0,
-    enableProxy: false,
-    proxyUrl: '',
-    proxyCache: false,
-    passwordAuth: false,
-    authUsername: '',
-    authPassword: '',
-    cors: false,
-    corsDomains: '*',
-    antiLeech: false,
-    antiLeechDomains: '',
-    enableSSL: false,
-    sslType: 'lets',
-    sslCert: '',
-    sslKey: '',
-    rewriteTemplate: '',
-    rewriteRules: '',
-    enableLoadBalance: false,
-    upstreamServers: []
+// ---------- 启停 ----------
+const toggleWebsite = async (row) => {
+  const action = row.status === 'running' ? 'stop' : 'start'
+  try {
+    await axios.post('/api/websites/' + encodeURIComponent(row.domain) + '/' + action)
+    ElMessage.success(action === 'start' ? '网站已启动' : '网站已停止')
+    await loadWebsites()
+  } catch (err) {
+    ElMessage.error('操作失败: ' + errMsg(err))
   }
-  editActiveTab.value = 'basic'
+}
+
+const openWebsite = (row) => {
+  if (row.status !== 'running') {
+    ElMessage.warning('网站未运行，请先启动')
+    return
+  }
+  window.open((row.sslEnabled ? 'https' : 'http') + '://' + row.domain, '_blank')
+}
+
+// ---------- 编辑 ----------
+const openEditDrawer = (row) => {
+  currentEditSite.value = row
+  editForm.value = {
+    domain: row.domain,
+    aliases: [...(row.aliases || [])],
+    phpVersion: row.phpVersion || '8.2',
+    port: row.port || 80,
+    rootDir: row.rootDir || row.path,
+    remark: row.remark || '',
+    type: row.type
+  }
   editDrawerVisible.value = true
 }
 
-const saveEdit = async () => {
+const confirmEdit = async () => {
+  const domain = currentEditSite.value ? currentEditSite.value.domain : ''
+  if (!domain) return
   saving.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    if (currentEditSite.value) {
-      currentEditSite.value.domain = editForm.value.domain
-      currentEditSite.value.phpVersion = editForm.value.phpVersion
-      currentEditSite.value.path = editForm.value.rootPath
-    }
-    ElMessage.success('保存成功')
+    await axios.put('/api/websites/' + encodeURIComponent(domain), {
+      aliases: editForm.value.aliases,
+      phpVersion: editForm.value.phpVersion,
+      port: editForm.value.port,
+      remark: editForm.value.remark,
+      type: editForm.value.type
+    })
+    ElMessage.success('已保存')
     editDrawerVisible.value = false
+    await loadWebsites()
   } catch (err) {
-    ElMessage.error('保存失败: ' + err.message)
+    ElMessage.error('保存失败: ' + errMsg(err))
   } finally {
     saving.value = false
   }
 }
 
-const addUpstream = () => {
-  editForm.value.upstreamServers.push({ address: '', weight: 1 })
+// ---------- SSL ----------
+const openSslDrawer = (row) => {
+  currentSslSite.value = row
+  sslForm.value = { fullchain: '', privkey: '', forceSSL: true }
+  sslDrawerVisible.value = true
 }
 
-const removeUpstream = (index) => {
-  editForm.value.upstreamServers.splice(index, 1)
-}
-
-const browseDirectory = () => {
-  ElMessage.info('目录浏览器开发中')
-}
-
-const toggleWebsite = async (website) => {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    website.status = website.status === 'running' ? 'stopped' : 'running'
-    ElMessage.success(`网站已${website.status === 'running' ? '启动' : '停止'}`)
-  } catch (err) {
-    ElMessage.error('操作失败: ' + err.message)
-  }
-}
-
-const openWebsite = (website) => {
-  if (website.status !== 'running') {
-    ElMessage.warning('网站未运行，请先启动')
+const confirmSSL = async () => {
+  const domain = currentSslSite.value ? currentSslSite.value.domain : ''
+  if (!domain) return
+  if (!sslForm.value.fullchain.trim() || !sslForm.value.privkey.trim()) {
+    ElMessage.warning('证书和私钥不能为空')
     return
   }
-  window.open(`http://${website.domain}`, '_blank')
-}
-
-const openDirectory = (website) => {
-  ElMessage.info(`跳转到 ${website.path}`)
-}
-
-const editRemark = (website) => {
-  currentWebsite.value = website
-  editingRemark.value = website.remark || ''
-  remarkDialogVisible.value = true
-}
-
-const saveRemark = () => {
-  if (currentWebsite.value) {
-    currentWebsite.value.remark = editingRemark.value
-    ElMessage.success('备注已更新')
-  }
-  remarkDialogVisible.value = false
-}
-
-const openBackupDrawer = (website) => {
-  currentBackupSite.value = website
-  backupType.value = 'full'
-  backupName.value = ''
-  backupRemark.value = ''
-  backupDrawerVisible.value = true
-}
-
-const confirmBackup = async () => {
-  backingUp.value = true
+  sslSaving.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    ElMessage.success('备份创建成功')
-    backupDrawerVisible.value = false
+    await axios.post('/api/websites/' + encodeURIComponent(domain) + '/ssl', {
+      fullchain: sslForm.value.fullchain,
+      privkey: sslForm.value.privkey,
+      forceSSL: sslForm.value.forceSSL
+    })
+    ElMessage.success('证书已部署')
+    sslDrawerVisible.value = false
+    await loadWebsites()
   } catch (err) {
-    ElMessage.error('备份失败: ' + err.message)
+    ElMessage.error('部署失败: ' + errMsg(err))
   } finally {
-    backingUp.value = false
+    sslSaving.value = false
   }
 }
 
-const handleCommand = (command, website) => {
+const disableSSL = async () => {
+  const domain = currentSslSite.value ? currentSslSite.value.domain : ''
+  if (!domain) return
+  try {
+    await axios.delete('/api/websites/' + encodeURIComponent(domain) + '/ssl')
+    ElMessage.success('SSL 已关闭')
+    sslDrawerVisible.value = false
+    await loadWebsites()
+  } catch (err) {
+    ElMessage.error('操作失败: ' + errMsg(err))
+  }
+}
+
+// ---------- 更多操作 ----------
+const handleCommand = (command, row) => {
   switch (command) {
     case 'edit':
-      openEditDrawer(website)
+      openEditDrawer(row)
       break
-    case 'config':
-      ElMessage.info('配置文件功能开发中')
+    case 'ssl':
+      openSslDrawer(row)
       break
-    case 'logs':
-      ElMessage.info('日志查看功能开发中')
-      break
-    case 'backup':
-      openBackupDrawer(website)
+    case 'restart':
+      restartWebsite(row)
       break
     case 'delete':
-      ElMessageBox.confirm(`确定删除网站 ${website.domain} 吗？`, '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(async () => {
-        const index = websites.value.findIndex(w => w.id === website.id)
-        if (index !== -1) {
-          websites.value.splice(index, 1)
-          ElMessage.success('网站已删除')
-        }
-      }).catch(() => {})
+      deleteWebsite(row)
       break
   }
 }
+
+const restartWebsite = async (row) => {
+  try {
+    await axios.post('/api/websites/' + encodeURIComponent(row.domain) + '/restart')
+    ElMessage.success('网站已重启')
+    await loadWebsites()
+  } catch (err) {
+    ElMessage.error('重启失败: ' + errMsg(err))
+  }
+}
+
+const deleteWebsite = async (row) => {
+  try {
+    const res = await ElMessageBox.prompt(
+      '删除网站 ' + row.domain + '。\\n如需保留站点文件，请输入 keep；直接确认则连同文件一起删除。',
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        inputPlaceholder: '输入 keep 保留文件',
+        inputValue: '',
+        type: 'warning'
+      }
+    )
+    const keepFiles = String((res && res.value) || '').trim().toLowerCase() === 'keep'
+    await axios.delete('/api/websites/' + encodeURIComponent(row.domain), { params: { keepFiles } })
+    ElMessage.success('网站已删除')
+    await loadWebsites()
+  } catch (err) {
+    // 用户取消或输入框关闭时不做提示
+    if (err === 'cancel') return
+    ElMessage.error('删除失败: ' + errMsg(err))
+  }
+}
+
+// ---------- 批量 ----------
+const handleSelectionChange = (selection) => {
+  selectedRows.value = selection
+}
+
+const batchStart = async () => {
+  for (const row of selectedRows.value) {
+    if (row.status !== 'running') {
+      try {
+        await axios.post('/api/websites/' + encodeURIComponent(row.domain) + '/start')
+      } catch (e) { /* 继续处理下一个 */ }
+    }
+  }
+  ElMessage.success('批量启动完成')
+  await loadWebsites()
+}
+
+const batchStop = async () => {
+  for (const row of selectedRows.value) {
+    if (row.status === 'running') {
+      try {
+        await axios.post('/api/websites/' + encodeURIComponent(row.domain) + '/stop')
+      } catch (e) { /* 继续处理下一个 */ }
+    }
+  }
+  ElMessage.success('批量停止完成')
+  await loadWebsites()
+}
+
+const batchDelete = async () => {
+  try {
+    await ElMessageBox.confirm('确定删除选中的 ' + selectedRows.value.length + ' 个网站吗？（站点文件将一并删除）', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch (err) {
+    return
+  }
+  for (const row of selectedRows.value) {
+    try {
+      await axios.delete('/api/websites/' + encodeURIComponent(row.domain))
+    } catch (e) { /* 继续处理下一个 */ }
+  }
+  ElMessage.success('批量删除完成')
+  await loadWebsites()
+}
+
+const copyText = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制: ' + text)
+  } catch (err) {
+    ElMessage.info(text)
+  }
+}
+
+onMounted(() => {
+  refreshAll()
+})
 </script>
 
 <style scoped>
@@ -681,7 +713,41 @@ const handleCommand = (command, website) => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+}
+
+.gateway-bar {
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gw-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gw-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.gw-meta {
+  font-size: 12px;
+  color: #909399;
+}
+
+.gw-right {
+  display: flex;
+  gap: 8px;
 }
 
 .top-panel {
@@ -701,113 +767,94 @@ const handleCommand = (command, website) => {
   flex-wrap: wrap;
 }
 
-.top-right {
-  flex-shrink: 0;
-}
-
 .websites-panel {
   background: #ffffff;
   border-radius: 4px;
-  padding: 0;
+  padding: 8px;
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
 }
 
-.folder-link {
+.domain-cell {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #477779;
-  cursor: pointer;
 }
 
-.folder-link:hover {
-  text-decoration: underline;
+.path-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.path-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #606266;
+}
+
+.copy-icon {
+  cursor: pointer;
+  color: #909399;
+}
+
+.copy-icon:hover {
+  color: #409eff;
 }
 
 .status-badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 12px;
+  line-height: 18px;
 }
 
 .status-badge.running {
-  background-color: #e8f4e8;
-  color: #2e7d32;
+  background: #f0f9eb;
+  color: #67c23a;
 }
 
-.status-badge.stopped {
-  background-color: #f4e8e8;
-  color: #c62828;
+.status-badge.stopped,
+.status-badge.not_installed,
+.status-badge.unknown {
+  background: #f4f4f5;
+  color: #909399;
 }
 
 .remark-cell {
   cursor: pointer;
 }
 
-.remark-cell:hover {
-  color: #477779;
+.remark-placeholder {
+  color: #c0c4cc;
 }
 
-.remark-placeholder {
-  color: #9ca3af;
-  font-style: italic;
+.empty-tip {
+  padding: 32px 0;
+  color: #909399;
+  font-size: 13px;
 }
 
 .drawer-content {
-  padding: 0 4px;
-}
-
-.form-tip {
-  font-size: 11px;
-  color: #9ca3af;
-  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .drawer-footer {
+  margin-top: auto;
+  padding-top: 16px;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.upstream-list {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
-  width: 100%;
+  border-top: 1px solid #ebeef5;
 }
 
-.upstream-item {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.backup-info {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  padding: 12px;
-  margin-bottom: 20px;
-}
-
-.backup-site {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-}
-</style><style>
-.top-panel .el-button {
-  height: 28px !important;
-  line-height: 28px !important;
-  padding: 0 12px !important;
-  font-size: 12px !important;
-}
-.top-panel .el-input__wrapper {
-  height: 28px !important;
-  padding: 0 8px !important;
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>

@@ -2,99 +2,136 @@ package service
 
 import (
 	"errors"
-	"os"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"upanel/internal/config"
 )
 
+// DefaultPassword 首次安装且未设置密码时的兜底密码
+const DefaultPassword = "upanel123"
+
+// AuthService 基于配置文件的单用户认证服务
 type AuthService struct {
-	users      map[string]string
-	jwtSecret  []byte
+	mu     sync.Mutex
+	secret []byte
 }
 
-// 替换下面这行为你刚才生成的哈希值
-const adminPasswordHash = "$2a$10$KRDc8YeI5cqbCJomWW44Z.i3ZDNp70SvfVPM3f3Cwe.EGvj1ga4fa"
-
+// NewAuthService 创建认证服务。
+// 若配置文件中尚无密码哈希（全新安装），则写入默认密码并落盘。
 func NewAuthService() *AuthService {
-	secret := os.Getenv("JWT_SECRET")
+	cfg := config.Current()
+	if cfg.PasswordHash == "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(DefaultPassword), bcrypt.DefaultCost)
+		if err == nil {
+			_ = cfg.SetPasswordHash(string(hash))
+		}
+	}
+	secret := cfg.JWTSecret
 	if secret == "" {
-		secret = "upanel-default-secret-key-2024"
+		secret = "upanel-default-secret"
 	}
-	
-	return &AuthService{
-		users: map[string]string{
-			"admin": adminPasswordHash,
-		},
-		jwtSecret: []byte(secret),
-	}
+	return &AuthService{secret: []byte(secret)}
 }
 
+// Login 校验用户名密码，返回 JWT
 func (s *AuthService) Login(username, password string) (string, error) {
-	hashedPassword, exists := s.users[username]
-	if !exists {
-		return "", errors.New("用户不存在")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg := config.Current()
+	if username == "" || password == "" {
+		return "", errors.New("用户名和密码不能为空")
 	}
-	
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	if err != nil {
-		return "", errors.New("密码错误")
+	if username != cfg.Username {
+		return "", errors.New("用户名或密码错误")
 	}
-	
+
+	hash := cfg.PasswordHash
+	if hash == "" {
+		return "", errors.New("面板尚未初始化密码，请执行安装脚本或使用 up 命令设置")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		return "", errors.New("用户名或密码错误")
+	}
+
+	return s.issueToken(username)
+}
+
+func (s *AuthService) issueToken(username string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": username,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		"iat":      time.Now().Unix(),
 	})
-	
-	tokenString, err := token.SignedString(s.jwtSecret)
-	if err != nil {
-		return "", err
-	}
-	
-	return tokenString, nil
+	return token.SignedString(s.secret)
 }
 
+// ValidateToken 校验 JWT 并返回用户名
 func (s *AuthService) ValidateToken(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return s.jwtSecret, nil
+		return s.secret, nil
 	})
-	
 	if err != nil {
 		return "", err
 	}
-	
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		username, ok := claims["username"].(string)
-		if !ok {
-			return "", errors.New("invalid token claims")
+		if username, ok := claims["username"].(string); ok {
+			return username, nil
 		}
-		return username, nil
 	}
-	
 	return "", errors.New("invalid token")
 }
 
+// ChangePassword 修改密码（需校验旧密码）
 func (s *AuthService) ChangePassword(username, oldPassword, newPassword string) error {
-	hashedPassword, exists := s.users[username]
-	if !exists {
+	cfg := config.Current()
+	if username != cfg.Username {
 		return errors.New("用户不存在")
 	}
-	
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(oldPassword))
-	if err != nil {
-		return errors.New("旧密码错误")
+	if len(newPassword) < 6 {
+		return errors.New("新密码长度不能少于 6 位")
 	}
-	
-	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if cfg.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(cfg.PasswordHash), []byte(oldPassword)); err != nil {
+			return errors.New("旧密码错误")
+		}
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	
-	s.users[username] = string(newHashedPassword)
-	return nil
+	return cfg.SetPasswordHash(string(hash))
 }
+
+// SetPassword 强制设置密码（供 CLI / 安装脚本调用，无需旧密码）
+func (s *AuthService) SetPassword(newPassword string) error {
+	if len(newPassword) < 6 {
+		return errors.New("密码长度不能少于 6 位")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return config.Current().SetPasswordHash(string(hash))
+}
+
+// VerifyPassword 校验明文密码是否匹配
+func (s *AuthService) VerifyPassword(password string) bool {
+	cfg := config.Current()
+	if cfg.PasswordHash == "" {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(cfg.PasswordHash), []byte(password)) == nil
+}
+
+// Username 当前管理员用户名
+func (s *AuthService) Username() string {
+	return config.Current().Username
+}
+

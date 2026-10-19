@@ -67,6 +67,18 @@ func (h *AuthHandler) GetUserInfo(c *gin.Context) {
 	})
 }
 
+// pickString 从 map 中按顺序取第一个非空字符串值
+func pickString(m map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
 // 修改密码
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	username, exists := c.Get("username")
@@ -75,12 +87,21 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	
-	var req ChangePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// 同时兼容 snake_case 与 camelCase 字段命名
+	var raw map[string]interface{}
+	if err := c.ShouldBindJSON(&raw); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	req := ChangePasswordRequest{
+		OldPassword: pickString(raw, "old_password", "oldPassword"),
+		NewPassword: pickString(raw, "new_password", "newPassword"),
+	}
+	if req.OldPassword == "" || req.NewPassword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "旧密码与新密码均不能为空"})
+		return
+	}
+
 	err := h.service.ChangePassword(username.(string), req.OldPassword, req.NewPassword)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

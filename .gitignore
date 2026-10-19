@@ -1,0 +1,25 @@
+# ===== 操作系统 / 编辑器 =====
+.DS_Store
+Thumbs.db
+*.swp
+
+# ===== 前端依赖与构建产物 =====
+web/node_modules/
+web/dist/
+
+# ===== 发布包（由 scripts/build-release.sh 生成）=====
+release/
+
+# ===== Go =====
+vendor/
+
+# ===== 旧编译产物（根目录遗留）=====
+/up-linux
+/upanel-linux
+/upanel-mac
+
+# ===== 备份文件 =====
+*.bak
+
+# ===== WorkBuddy 项目数据（非源码）=====
+.workbuddy/

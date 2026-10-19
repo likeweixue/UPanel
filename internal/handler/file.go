@@ -17,6 +17,11 @@ func NewFileHandler() *FileHandler {
 	}
 }
 
+// RootPath 文件管理根目录
+func (h *FileHandler) RootPath() string {
+	return h.service.RootPath()
+}
+
 // 获取文件列表
 func (h *FileHandler) List(c *gin.Context) {
 	path := c.DefaultQuery("path", "")
