@@ -1,12 +1,8 @@
 <template>
   <router-view />
+  <UToastHost />
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { initTheme } from '@/themes'
-
-onMounted(() => {
-  initTheme()
-})
+import UToastHost from '@/components/ui/UToastHost.vue'
 </script>

@@ -1,11 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -52,7 +56,8 @@ func (r *Runtime) Client() *client.Client {
 
 // EnsureNetwork 确保共享网络存在
 func (r *Runtime) EnsureNetwork() error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 	if _, err := r.cli.NetworkInspect(ctx, NetworkName, types.NetworkInspectOptions{}); err == nil {
 		return nil
 	}
@@ -106,20 +111,33 @@ func (r *Runtime) PullImage(ref string, logFn func(string)) error {
 	}
 	defer rc.Close()
 
-	// 边读边丢弃即可，Docker 的进度 JSON 仅用于避免流阻塞
-	buf := make([]byte, 32*1024)
-	total := 0
+	// Docker ImagePull 在 HTTP 200 下也可能通过 JSON 流返回错误，
+	// 必须解析流内容，否则只会得到后续 ContainerCreate 的 "No such image"。
+	dec := json.NewDecoder(rc)
+	lastLog := time.Now()
 	for {
-		n, err := rc.Read(buf)
-		total += n
-		if logFn != nil && total > 0 && total%(1024*1024) < len(buf) {
-			logFn(fmt.Sprintf("正在拉取 %s ... (%d KB)", ref, total/1024))
+		var msg struct {
+			Status      string `json:"status"`
+			Error       string `json:"error"`
+			ErrorDetail struct {
+				Message string `json:"message"`
+			} `json:"errorDetail"`
 		}
-		if err == io.EOF {
-			break
+		if err := dec.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("读取镜像 %s 拉取进度失败: %w", ref, err)
 		}
-		if err != nil {
-			return fmt.Errorf("拉取镜像 %s 中断: %w", ref, err)
+		if msg.ErrorDetail.Message != "" {
+			return fmt.Errorf("拉取镜像 %s 失败: %s", ref, msg.ErrorDetail.Message)
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("拉取镜像 %s 失败: %s", ref, msg.Error)
+		}
+		if logFn != nil && msg.Status != "" && time.Since(lastLog) > 2*time.Second {
+			logFn(fmt.Sprintf("拉取 %s: %s", ref, msg.Status))
+			lastLog = time.Now()
 		}
 	}
 	if logFn != nil {
@@ -130,15 +148,20 @@ func (r *Runtime) PullImage(ref string, logFn func(string)) error {
 
 // ContainerSpec 描述一个待创建的容器
 type ContainerSpec struct {
-	Name       string            // 容器名（唯一）
-	Image      string            // 镜像
-	Env        []string          // 环境变量
-	Volumes    map[string]string // 宿主机路径 -> 容器内挂载点
-	Ports      map[string]string // 容器内端口 -> 宿主机端口（空字符串表示随机）
-	Network    string            // 网络名，默认 upanel_network
-	Entrypoint []string
-	Cmd        []string
-	MemoryMB   int64 // 内存限制，0 表示不限制
+	Name            string            // 容器名（唯一）
+	Image           string            // 镜像
+	Env             []string          // 环境变量
+	Volumes         map[string]string // 宿主机路径 -> 容器内挂载点
+	ReadOnlyVolumes []string          // 需要以只读方式挂载的宿主机路径（Volumes 的 key）
+	Ports           map[string]string // 容器内端口 -> 宿主机端口（空字符串表示随机）
+	Network         string            // 网络名，默认 upanel_network
+	Labels          map[string]string // 额外容器标签
+	Entrypoint      []string
+	Cmd             []string
+	MemoryMB        int64 // 内存限制，0 表示不限制
+	// BindLocalhost 为 true 时端口只绑定 127.0.0.1。
+	// 数据库、应用商店等带凭据的服务默认必须仅本机访问。
+	BindLocalhost bool
 }
 
 // CreateAndStart 创建并启动容器。若同名容器已存在：
@@ -154,7 +177,8 @@ func (r *Runtime) CreateAndStart(spec ContainerSpec) (string, error) {
 		netName = NetworkName
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	// 同名容器处理
 	if info, err := r.FindContainer(spec.Name); err == nil {
@@ -167,35 +191,70 @@ func (r *Runtime) CreateAndStart(spec ContainerSpec) (string, error) {
 	}
 
 	// 卷挂载
+	roSet := map[string]bool{}
+	for _, p := range spec.ReadOnlyVolumes {
+		roSet[p] = true
+	}
 	var binds []string
 	for hostPath, containerPath := range spec.Volumes {
 		if hostPath == "" || containerPath == "" {
 			continue
 		}
-		if err := os.MkdirAll(hostPath, 0755); err != nil {
-			return "", fmt.Errorf("创建挂载目录 %s 失败: %w", hostPath, err)
+		// 注意：hostPath 可能是文件（如 nginx.conf）而不是目录。
+		// 无条件 MkdirAll 会在文件已存在时返回 "not a directory"，导致网关无法创建。
+		if _, statErr := os.Stat(hostPath); statErr != nil {
+			if !os.IsNotExist(statErr) {
+				return "", fmt.Errorf("检查挂载路径 %s 失败: %w", hostPath, statErr)
+			}
+			if err := os.MkdirAll(hostPath, 0755); err != nil {
+				return "", fmt.Errorf("创建挂载目录 %s 失败: %w", hostPath, err)
+			}
 		}
-		binds = append(binds, fmt.Sprintf("%s:%s", hostPath, containerPath))
+		opts := make([]string, 0, 2)
+		if roSet[hostPath] {
+			opts = append(opts, "ro")
+		}
+		// SELinux 主机（CentOS/RHEL/Fedora）需要 :z 重新标记，否则容器内 nginx/php
+		// 会因 permission denied 无法读取站点文件；docker.sock 不做 relabel。
+		if !strings.HasSuffix(hostPath, "docker.sock") {
+			opts = append(opts, "z")
+		}
+		mode := ""
+		if len(opts) > 0 {
+			mode = ":" + strings.Join(opts, ",")
+		}
+		binds = append(binds, fmt.Sprintf("%s:%s%s", hostPath, containerPath, mode))
 	}
 
 	// 端口映射
 	portBindings := nat.PortMap{}
 	exposedPorts := nat.PortSet{}
+	hostIP := "0.0.0.0"
+	if spec.BindLocalhost {
+		hostIP = "127.0.0.1"
+	}
 	for containerPort, hostPort := range spec.Ports {
-		p := nat.Port(containerPort)
-		exposedPorts[p] = struct{}{}
+		p, err := nat.ParsePortSpec(containerPort)
+		if err != nil || len(p) == 0 {
+			return "", fmt.Errorf("无效的容器端口: %s", containerPort)
+		}
+		exposedPorts[p[0].Port] = struct{}{}
 		if hostPort != "" {
-			portBindings[p] = []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}}
+			portBindings[p[0].Port] = []nat.PortBinding{{HostIP: hostIP, HostPort: hostPort}}
 		} else {
-			portBindings[p] = []nat.PortBinding{{HostIP: "0.0.0.0"}}
+			portBindings[p[0].Port] = []nat.PortBinding{{HostIP: hostIP}}
 		}
 	}
 
+	labels := map[string]string{"managed-by": "upanel"}
+	for k, v := range spec.Labels {
+		labels[k] = v
+	}
 	cfg := &container.Config{
 		Image:        spec.Image,
 		Env:          spec.Env,
 		ExposedPorts: exposedPorts,
-		Labels:       map[string]string{"managed-by": "upanel"},
+		Labels:       labels,
 	}
 	if len(spec.Entrypoint) > 0 {
 		cfg.Entrypoint = spec.Entrypoint
@@ -205,17 +264,21 @@ func (r *Runtime) CreateAndStart(spec ContainerSpec) (string, error) {
 	}
 
 	hostCfg := &container.HostConfig{
-		Binds:        binds,
-		PortBindings: portBindings,
+		Binds:         binds,
+		PortBindings:  portBindings,
 		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
 	}
 	if spec.MemoryMB > 0 {
 		hostCfg.Memory = spec.MemoryMB * 1024 * 1024
 	}
 
+	networkID := netName
+	if n, err := r.cli.NetworkInspect(ctx, netName, types.NetworkInspectOptions{}); err == nil {
+		networkID = n.ID
+	}
 	netCfg := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			netName: {NetworkID: netName},
+			netName: {NetworkID: networkID},
 		},
 	}
 
@@ -275,7 +338,9 @@ func (r *Runtime) Start(name string) error {
 	if err != nil {
 		return err
 	}
-	return r.cli.ContainerStart(context.Background(), info.ID, types.ContainerStartOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	return r.cli.ContainerStart(ctx, info.ID, types.ContainerStartOptions{})
 }
 
 // Stop 停止容器
@@ -285,7 +350,9 @@ func (r *Runtime) Stop(name string) error {
 		return err
 	}
 	timeout := 10 * time.Second
-	return r.cli.ContainerStop(context.Background(), info.ID, &timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return r.cli.ContainerStop(ctx, info.ID, &timeout)
 }
 
 // Remove 强制删除容器
@@ -296,39 +363,66 @@ func (r *Runtime) Remove(name string) error {
 		return nil
 	}
 	timeout := 5 * time.Second
-	_ = r.cli.ContainerStop(context.Background(), info.ID, &timeout)
-	return r.cli.ContainerRemove(context.Background(), info.ID, types.ContainerRemoveOptions{
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_ = r.cli.ContainerStop(ctx, info.ID, &timeout)
+	return r.cli.ContainerRemove(ctx, info.ID, types.ContainerRemoveOptions{
 		Force:         true,
 		RemoveVolumes: true,
 	})
 }
 
-// Exec 在容器内执行命令并返回输出
-func (r *Runtime) Exec(name string, cmd ...string) (string, error) {
+// ExecResult 在容器内执行命令，返回合并后的输出与退出码。
+// 使用 stdcopy 解复用 Docker 的多路复用流，避免日志里出现二进制头。
+func (r *Runtime) ExecResult(name string, cmd ...string) (string, int, error) {
 	info, err := r.FindContainer(name)
 	if err != nil {
-		return "", err
+		return "", -1, err
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	idResp, err := r.cli.ContainerExecCreate(ctx, info.ID, types.ExecConfig{
 		Cmd:          cmd,
 		AttachStdout: true,
 		AttachStderr: true,
 	})
 	if err != nil {
-		return "", fmt.Errorf("创建 exec 失败: %w", err)
+		return "", -1, fmt.Errorf("创建 exec 失败: %w", err)
 	}
 	resp, err := r.cli.ContainerExecAttach(ctx, idResp.ID, types.ExecStartCheck{})
 	if err != nil {
-		return "", fmt.Errorf("attach exec 失败: %w", err)
+		return "", -1, fmt.Errorf("attach exec 失败: %w", err)
 	}
 	defer resp.Close()
 
-	out, err := io.ReadAll(resp.Reader)
-	if err != nil {
-		return string(out), err
+	var stdout, stderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdout, &stderr, resp.Reader); err != nil {
+		return strings.TrimSpace(stdout.String() + "\n" + stderr.String()), -1, err
 	}
-	return string(out), nil
+	inspect, err := r.cli.ContainerExecInspect(ctx, idResp.ID)
+	if err != nil {
+		return strings.TrimSpace(stdout.String() + "\n" + stderr.String()), -1, err
+	}
+	out := strings.TrimSpace(stdout.String())
+	if s := strings.TrimSpace(stderr.String()); s != "" {
+		if out != "" {
+			out += "\n"
+		}
+		out += s
+	}
+	return out, inspect.ExitCode, nil
+}
+
+// Exec 在容器内执行命令；非零退出码返回错误并附带输出。
+func (r *Runtime) Exec(name string, cmd ...string) (string, error) {
+	out, code, err := r.ExecResult(name, cmd...)
+	if err != nil {
+		return out, err
+	}
+	if code != 0 {
+		return out, fmt.Errorf("命令退出码 %d: %s", code, out)
+	}
+	return out, nil
 }
 
 // ContainerState 返回容器状态，不存在返回 ""
@@ -431,4 +525,139 @@ func (r *Runtime) HostPort(name, containerPort string) int {
 		}
 	}
 	return 0
+}
+
+// ImageInfo 镜像快照
+type ImageInfo struct {
+	ID      string   `json:"id"`
+	Tags    []string `json:"tags"`
+	Size    int64    `json:"size"`
+	Created int64    `json:"created"`
+}
+
+// ListImages 列出本地镜像（用于容器页「镜像」标签）
+func (r *Runtime) ListImages() ([]ImageInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	list, err := r.cli.ImageList(ctx, types.ImageListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ImageInfo, 0, len(list))
+	for _, img := range list {
+		tags := img.RepoTags
+		if len(tags) == 0 {
+			tags = []string{"<none>:<none>"}
+		}
+		id := img.ID
+		if len(id) > 19 {
+			id = id[7:19]
+		}
+		out = append(out, ImageInfo{ID: id, Tags: tags, Size: img.Size, Created: img.Created})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Created > out[j].Created })
+	return out, nil
+}
+
+// VolumeInfo 数据卷快照
+type VolumeInfo struct {
+	Name       string `json:"name"`
+	Driver     string `json:"driver"`
+	Mountpoint string `json:"mountpoint"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+// ListVolumes 列出数据卷
+func (r *Runtime) ListVolumes() ([]VolumeInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := r.cli.VolumeList(ctx, filters.NewArgs())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VolumeInfo, 0, len(resp.Volumes))
+	for _, v := range resp.Volumes {
+		out = append(out, VolumeInfo{Name: v.Name, Driver: v.Driver, Mountpoint: v.Mountpoint, CreatedAt: v.CreatedAt})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// NetworkInfo 网络快照
+type NetworkInfo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Driver string `json:"driver"`
+	Scope  string `json:"scope"`
+}
+
+// ListNetworks 列出 Docker 网络
+func (r *Runtime) ListNetworks() ([]NetworkInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	list, err := r.cli.NetworkList(ctx, types.NetworkListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]NetworkInfo, 0, len(list))
+	for _, n := range list {
+		out = append(out, NetworkInfo{ID: n.ID, Name: n.Name, Driver: n.Driver, Scope: n.Scope})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// Logs 读取容器日志（自动解复用 Docker 流），最多返回 2MB。
+func (r *Runtime) Logs(name string, tail int) (string, error) {
+	info, err := r.FindContainer(name)
+	if err != nil {
+		return "", err
+	}
+	if tail <= 0 || tail > 5000 {
+		tail = 200
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	rc, err := r.cli.ContainerLogs(ctx, info.ID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       fmt.Sprintf("%d", tail),
+	})
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	var stdout, stderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdout, &stderr, rc); err != nil {
+		return stdout.String() + stderr.String(), err
+	}
+	out := stdout.String()
+	if s := stderr.String(); s != "" {
+		if out != "" {
+			out += "\n"
+		}
+		out += s
+	}
+	const maxLen = 2 << 20
+	if len(out) > maxLen {
+		out = out[len(out)-maxLen:]
+	}
+	return out, nil
+}
+
+// copyDemux 解复用 Docker 容器的多路复用输出流（stdout+stderr）。
+func copyDemux(dst *strings.Builder, src io.Reader) (int64, error) {
+	var stdout, stderr bytes.Buffer
+	n, err := stdcopy.StdCopy(&stdout, &stderr, src)
+	if stdout.Len() > 0 {
+		dst.WriteString(stdout.String())
+	}
+	if stderr.Len() > 0 {
+		if dst.Len() > 0 && !strings.HasSuffix(dst.String(), "\n") {
+			dst.WriteString("\n")
+		}
+		dst.WriteString(stderr.String())
+	}
+	return n, err
 }

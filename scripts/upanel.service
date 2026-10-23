@@ -1,6 +1,6 @@
 [Unit]
 Description=UPanel - Lightweight Docker Management Panel
-Documentation=https://github.com/upanel/upanel
+Documentation=https://github.com/likeweixue/UPanel
 After=network-online.target docker.service
 Wants=network-online.target
 

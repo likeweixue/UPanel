@@ -15,7 +15,7 @@ if [ -z "$VERSION" ]; then
     if [ -f "$ROOT/VERSION" ]; then
         VERSION="$(cat "$ROOT/VERSION")"
     else
-        VERSION="v0.1.6-lts"
+        VERSION="v0.1.7"
     fi
 fi
 

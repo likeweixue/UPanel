@@ -30,10 +30,19 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Update(&patch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	restartRequired, err := h.service.Update(&patch)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "设置已更新", "data": h.service.GetAll()})
+	message := "设置已更新"
+	if restartRequired {
+		message = "设置已保存。端口/监听地址/安全入口的变更需要重启面板后生效（up 3）"
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":         message,
+		"data":            h.service.GetAll(),
+		"restartRequired": restartRequired,
+	})
 }

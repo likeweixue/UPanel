@@ -1,723 +1,533 @@
 <template>
-  <div class="files-container">
-    <!-- 顶部分类面板 -->
-    <div class="top-panel">
-      <div class="top-left">
-        <el-button size="small" @click="uploadFile">
-          <el-icon><Upload /></el-icon> 上传文件
-        </el-button>
-        <el-button size="small" @click="goBack" :disabled="!canGoBack">
-          <el-icon><ArrowLeft /></el-icon> 后退
-        </el-button>
-        <el-button size="small" @click="goForward" :disabled="!canGoForward">
-          <el-icon><ArrowRight /></el-icon> 前进
-        </el-button>
-        <el-button size="small" @click="refreshFiles">
-          <el-icon><Refresh /></el-icon> 刷新
-        </el-button>
-        
-        <el-dropdown @command="handleCreateCommand">
-          <el-button size="small">
-            创建 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="folder">新建文件夹</el-dropdown-item>
-              <el-dropdown-item command="file">新建文件</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        
-        <el-button size="small" @click="openTerminal">
-          <el-icon><Monitor /></el-icon> 终端
-        </el-button>
+  <div class="page">
+    <header class="page__header">
+      <div>
+        <div class="page__title-row">
+          <h1 class="page__title">文件管理</h1>
+          <span class="badge">{{ rootPath || '/' }}</span>
+        </div>
+        <p class="page__subtitle truncate">{{ currentAbs || '正在读取文件系统…' }}</p>
       </div>
-      <div class="top-right">
-        <el-input 
-          v-model="searchKeyword" 
-          placeholder="搜索文件" 
-          prefix-icon="Search"
-          clearable
-          size="small"
-          style="width: 200px"
+      <div class="page__actions">
+        <UButton icon="refresh" label="刷新" :loading="loading" @click="loadPath(currentPath)" />
+        <UButton icon="folder" label="新建文件夹" @click="openCreate('folder')" />
+        <UButton icon="file" label="新建文件" @click="openCreate('file')" />
+        <UButton variant="primary" icon="upload" label="上传文件" @click="triggerUpload" />
+      </div>
+    </header>
+
+    <div v-if="error" class="alert alert--danger" role="alert">
+      <UIcon name="alert" :size="16" class="alert__icon" />
+      <div class="alert__body">{{ error }}</div>
+    </div>
+
+    <div class="toolbar">
+      <nav class="breadcrumb" aria-label="当前目录">
+        <button type="button" class="breadcrumb__item" @click="loadPath('')">
+          <UIcon name="home" :size="14" /> 根目录
+        </button>
+        <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
+          <UIcon name="chevron-right" :size="12" class="subtle" aria-hidden="true" />
+          <button
+            type="button"
+            class="breadcrumb__item"
+            :class="{ 'breadcrumb__item--current': index === breadcrumbs.length - 1 }"
+            @click="loadPath(crumb.path)"
+          >
+            {{ crumb.label }}
+          </button>
+        </template>
+      </nav>
+      <div class="toolbar__right">
+        <UButton
+          variant="secondary"
+          icon="arrow-up"
+          label="上级目录"
+          :disabled="!currentPath"
+          @click="goUp"
         />
-        <el-button size="small" type="danger" plain @click="batchDelete" :disabled="selectedFiles.length === 0">
-          删除 ({{ selectedFiles.length }})
-        </el-button>
-        <el-button size="small" @click="openRecycleBin">
-          <el-icon><Delete /></el-icon> 回收站
-        </el-button>
+        <div class="input-affix" style="width: 200px">
+          <UIcon name="search" :size="14" class="subtle" style="position: absolute; left: 10px" />
+          <input v-model="search" class="input input--sm" placeholder="筛选当前目录" style="padding-left: 30px" />
+        </div>
       </div>
     </div>
 
-    <!-- 面包屑导航 -->
-    <div class="breadcrumb-panel">
-      <div class="breadcrumb-content">
-        <span class="breadcrumb-item" @click="navigateTo('')">
-          <el-icon><HomeFilled /></el-icon> 根目录
-        </span>
-        <el-icon class="separator"><ArrowRight /></el-icon>
-        <span 
-          v-for="(part, index) in breadcrumbs" 
-          :key="index"
-          class="breadcrumb-item"
-          :class="{ active: index === breadcrumbs.length - 1 }"
-          @click="navigateTo(breadcrumbPaths[index])"
-        >
-          {{ part }}
-        </span>
-      </div>
-      <div class="path-info">{{ currentPathAbs }}</div>
-    </div>
+    <input ref="uploadInput" type="file" class="sr-only" aria-hidden="true" tabindex="-1" @change="onUpload" />
 
-    <!-- 文件列表表格 -->
-    <div class="files-panel">
-      <el-table 
-        :data="filteredFiles" 
-        
-        style="width: 100%"
-        @selection-change="handleSelectionChange"
-        @row-dblclick="openItem"
+    <div v-if="loading" class="loading-block"><span class="spinner" /> 正在读取目录…</div>
+
+    <div v-else-if="filteredEntries.length === 0" class="table-wrap">
+      <UEmpty
+        icon="folder-open"
+        :title="search ? '没有匹配的文件' : '这个目录是空的'"
+        :description="search ? '换个关键词试试。' : '上传文件或新建文件夹开始使用。'"
       >
-        <el-table-column type="selection" width="45" />
-        <el-table-column label="名称" min-width="250">
-          <template #default="{ row }">
-            <div class="file-name" @click="openItem(row)">
-              <el-icon :size="18" :color="row.is_dir ? '#477779' : '#9ca3af'">
-                <component :is="row.is_dir ? Folder : getFileIcon(row.extension)" />
-              </el-icon>
-              <span>{{ row.name }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="size" label="大小" width="100">
-          <template #default="{ row }">
-            {{ row.is_dir ? '-' : formatFileSize(row.size) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="mod_time" label="修改时间" width="160">
-          <template #default="{ row }">
-            {{ new Date(row.mod_time).toLocaleString() }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" text @click="renameItem(row)">
-              <el-icon><Edit /></el-icon>
-            </el-button>
-            <el-button size="small" text @click="copyItem(row)">
-              <el-icon><CopyDocument /></el-icon>
-            </el-button>
-            <el-button size="small" text @click="moveItem(row)">
-              <el-icon><Position /></el-icon>
-            </el-button>
-            <el-button size="small" text type="danger" @click="deleteItem(row)">
-              <el-icon><Delete /></el-icon>
-            </el-button>
-            <el-dropdown v-if="!row.is_dir" @command="(cmd) => handleFileCommand(cmd, row)">
-              <el-button size="small" text>
-                <el-icon><MoreFilled /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                  <el-dropdown-item command="download">下载</el-dropdown-item>
-                  <el-dropdown-item command="compress">压缩</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
+        <div class="row">
+          <UButton icon="upload" label="上传文件" @click="triggerUpload" />
+          <UButton icon="plus" label="新建文件夹" @click="openCreate('folder')" />
+        </div>
+      </UEmpty>
     </div>
 
-    <!-- 新建文件夹/文件对话框 -->
-    <el-dialog v-model="createDialogVisible" :title="createType === 'folder' ? '新建文件夹' : '新建文件'" width="400px">
-      <el-input v-model="createName" :placeholder="createType === 'folder' ? '请输入文件夹名称' : '请输入文件名称'" />
-      <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmCreate">确定</el-button>
-      </template>
-    </el-dialog>
+    <div v-else class="table-wrap">
+      <table class="table">
+        <caption class="sr-only">目录文件列表</caption>
+        <thead>
+          <tr>
+            <th scope="col">名称</th>
+            <th scope="col">大小</th>
+            <th scope="col">修改时间</th>
+            <th scope="col">权限</th>
+            <th scope="col" style="text-align: right">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in filteredEntries" :key="entry.path">
+            <td>
+              <button type="button" class="file-open" @click="openEntry(entry)">
+                <span class="file-open__icon" :class="entry.isDir ? 'file-open__icon--dir' : ''">
+                  <UIcon :name="fileIcon(entry)" :size="16" />
+                </span>
+                <span class="truncate">{{ entry.name }}</span>
+                <span v-if="entry.isDir" class="subtle" style="font-size: 11px">目录</span>
+              </button>
+            </td>
+            <td class="muted">{{ entry.isDir ? '—' : formatBytes(entry.size) }}</td>
+            <td class="muted">{{ formatDate(entry.modTime) }}</td>
+            <td><span class="chip mono" style="font-size: 10px">{{ entry.mode }}</span></td>
+            <td>
+              <div class="table__actions">
+                <UButton
+                  v-if="!entry.isDir"
+                  variant="ghost"
+                  icon-only
+                  size="sm"
+                  icon="eye"
+                  aria-label="编辑文件内容"
+                  title="编辑"
+                  @click="openEditor(entry)"
+                />
+                <UButton
+                  v-if="!entry.isDir"
+                  variant="ghost"
+                  icon-only
+                  size="sm"
+                  icon="download"
+                  :aria-label="`下载 ${entry.name}`"
+                  title="下载"
+                  @click="downloadEntry(entry)"
+                />
+                <UButton
+                  variant="ghost"
+                  icon-only
+                  size="sm"
+                  icon="edit"
+                  aria-label="重命名"
+                  title="重命名"
+                  @click="openRename(entry)"
+                />
+                <UButton
+                  variant="ghost"
+                  icon-only
+                  size="sm"
+                  icon="trash"
+                  aria-label="删除"
+                  title="删除"
+                  @click="openDelete(entry)"
+                />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名" width="400px">
-      <el-input v-model="renameName" placeholder="请输入新名称" />
-      <template #footer>
-        <el-button @click="renameDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmRename">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 编辑文件对话框 -->
-    <el-dialog v-model="editDialogVisible" title="编辑文件" width="70%">
-      <el-input 
-        v-model="editContent" 
-        type="textarea" 
-        :rows="20"
-        placeholder="文件内容"
-      />
-      <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveFileContent">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 移动/复制对话框 -->
-    <el-dialog v-model="moveDialogVisible" :title="moveType === 'move' ? '移动到' : '复制到'" width="500px">
-      <div class="move-path">
-        <el-input v-model="movePath" placeholder="目标路径">
-          <template #prepend>路径</template>
-        </el-input>
+    <div class="alert alert--info">
+      <UIcon name="shield" :size="16" class="alert__icon" />
+      <div class="alert__body">
+        文件管理以面板进程权限运行（通常是 root），请谨慎修改系统目录。单个文件读取上限 8MB，上传上限 2GB。
       </div>
-      <div class="move-tip">当前路径: {{ currentPathAbs }}</div>
-      <template #footer>
-        <el-button @click="moveDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmMove">确定</el-button>
-      </template>
-    </el-dialog>
+    </div>
 
-    <!-- 回收站抽屉 -->
-    <el-drawer v-model="recycleDrawerVisible" title="回收站" direction="rtl" size="500px">
-      <div class="recycle-content">
-        <el-table :data="recycleBin" style="width: 100%">
-          <el-table-column prop="name" label="名称" min-width="180" />
-          <el-table-column prop="originalPath" label="原路径" min-width="200" />
-          <el-table-column prop="deleteTime" label="删除时间" width="160" />
-          <el-table-column label="操作" width="150">
-            <template #default="{ row }">
-              <el-button size="small" @click="restoreItem(row)">还原</el-button>
-              <el-button size="small" type="danger" @click="permanentDelete(row)">彻底删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="recycle-footer">
-          <el-button size="small" type="danger" @click="emptyRecycleBin">清空回收站</el-button>
+    <!-- 新建 -->
+    <UModal v-model="createOpen" :title="createType === 'folder' ? '新建文件夹' : '新建文件'" size="sm" :busy="submitting">
+      <form id="create-entry-form" @submit.prevent="submitCreate">
+        <UField :label="createType === 'folder' ? '文件夹名称' : '文件名'" for-id="entry-name" required>
+          <UInput id="entry-name" v-model="createName"
+              autofocus autocomplete="off" placeholder="例如 app" @keyup.enter="submitCreate" />
+        </UField>
+        <p v-if="modalError" class="field__error" role="alert" style="margin-top: 8px">{{ modalError }}</p>
+      </form>
+      <template #footer>
+        <UButton variant="secondary" @click="createOpen = false">取消</UButton>
+        <UButton variant="primary" :loading="submitting" label="创建" @click="submitCreate" />
+      </template>
+    </UModal>
+
+    <!-- 重命名 -->
+    <UModal v-model="renameOpen" title="重命名" size="sm" :busy="submitting">
+      <form id="rename-form" @submit.prevent="submitRename">
+        <UField label="新名称" for-id="rename-name" required>
+          <UInput id="rename-name" v-model="renameName" autocomplete="off" @keyup.enter="submitRename" />
+        </UField>
+        <p v-if="modalError" class="field__error" role="alert" style="margin-top: 8px">{{ modalError }}</p>
+      </form>
+      <template #footer>
+        <UButton variant="secondary" @click="renameOpen = false">取消</UButton>
+        <UButton variant="primary" :loading="submitting" label="保存" @click="submitRename" />
+      </template>
+    </UModal>
+
+    <!-- 删除 -->
+    <UModal v-model="deleteOpen" title="删除确认" size="sm" :busy="submitting">
+      <div class="stack">
+        <p>确定删除 <strong>{{ deleteTarget?.name }}</strong> 吗？</p>
+        <div class="alert alert--danger">
+          <UIcon name="alert" :size="16" class="alert__icon" />
+          <div class="alert__body">
+            {{ deleteTarget?.isDir ? '目录及其全部内容会被递归删除。' : '文件会被永久删除。' }}此操作不可撤销。
+          </div>
         </div>
       </div>
-    </el-drawer>
+      <template #footer>
+        <UButton variant="secondary" @click="deleteOpen = false">取消</UButton>
+        <UButton variant="danger" :loading="submitting" icon="trash" label="删除" @click="submitDelete" />
+      </template>
+    </UModal>
 
-    <!-- 上传文件抽屉 -->
-    <el-drawer v-model="uploadDrawerVisible" title="上传文件" direction="rtl" size="400px">
-      <div class="upload-content">
-        <el-upload
-          class="upload-area"
-          drag
-          multiple
-          :auto-upload="false"
-          :on-change="handleFilesChange"
-          :show-file-list="true"
-        >
-          <el-icon class="upload-icon"><Upload /></el-icon>
-          <div class="upload-text">点击或拖拽文件到此区域上传</div>
-          <div class="upload-hint">支持任意文件格式</div>
-        </el-upload>
-        <div class="upload-footer">
-          <el-button @click="uploadDrawerVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmUpload" :loading="uploading">开始上传</el-button>
+    <!-- 编辑器 -->
+    <UModal v-model="editorOpen" :title="editorEntry?.name || '编辑文件'" size="xl" :busy="submitting">
+      <div class="stack">
+        <p class="subtle mono" style="font-size: 11px">{{ editorEntry?.path }}</p>
+        <div v-if="editorLoading" class="loading-block"><span class="spinner" /> 正在读取文件…</div>
+        <UTextarea
+          v-else
+          v-model="editorContent"
+          code
+          :rows="20"
+          aria-label="文件内容"
+          spellcheck="false"
+        />
+        <p v-if="modalError" class="field__error" role="alert">{{ modalError }}</p>
+        <div class="row" style="justify-content: space-between">
+          <span class="subtle" style="font-size: 12px">{{ editorContent.length }} 字符 · 最大 8MB</span>
+          <span class="subtle" style="font-size: 12px">保存后将直接写入服务器文件</span>
         </div>
       </div>
-    </el-drawer>
+      <template #footer>
+        <UButton variant="secondary" @click="editorOpen = false">关闭</UButton>
+        <UButton variant="primary" :loading="submitting" icon="save" label="保存文件" @click="submitEditor" />
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Upload, ArrowLeft, ArrowRight, Refresh, ArrowDown, Monitor, 
-  Delete, HomeFilled, Folder, Edit, 
-  CopyDocument, Position, MoreFilled, Document, 
-  Picture, VideoCamera, Headset, Files
-} from '@element-plus/icons-vue'
-import axios from 'axios'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import UButton from '@/components/ui/UButton.vue'
+import UEmpty from '@/components/ui/UEmpty.vue'
+import UField from '@/components/ui/UField.vue'
+import UIcon from '@/components/ui/UIcon.vue'
+import UInput from '@/components/ui/UInput.vue'
+import UModal from '@/components/ui/UModal.vue'
+import UTextarea from '@/components/ui/UTextarea.vue'
+import { errText, fileApi } from '@/api'
+import { formatBytes, formatDate } from '@/composables/useFormat'
+import { toastError, toastSuccess } from '@/composables/useToast'
 
-const files = ref([])
-const loading = ref(false)
+const route = useRoute()
+const router = useRouter()
+
+const rootPath = ref('/')
 const currentPath = ref('')
-const currentPathAbs = ref('')
-const searchKeyword = ref('')
-const selectedFiles = ref([])
-
-const history = ref([])
-const historyIndex = ref(-1)
-const canGoBack = computed(() => historyIndex.value > 0)
-const canGoForward = computed(() => historyIndex.value < history.value.length - 1)
-
-const createDialogVisible = ref(false)
-const createType = ref('folder')
-const createName = ref('')
-const renameDialogVisible = ref(false)
-const renameName = ref('')
-const renameTarget = ref(null)
-const editDialogVisible = ref(false)
-const editContent = ref('')
-const editFilePath = ref('')
-const moveDialogVisible = ref(false)
-const moveType = ref('move')
-const movePath = ref('')
-const moveTarget = ref(null)
-const recycleDrawerVisible = ref(false)
-const uploadDrawerVisible = ref(false)
-const recycleBin = ref([])
-const uploadFiles = ref([])
-const uploading = ref(false)
+const currentAbs = ref('')
+const entries = ref([])
+const loading = ref(false)
+const error = ref('')
+const search = ref('')
+const uploadInput = ref(null)
 
 const breadcrumbs = computed(() => {
-  if (!currentPath.value) return []
-  return currentPath.value.split('/').filter(p => p)
+  const parts = currentPath.value.split('/').filter(Boolean)
+  return parts.map((part, index) => ({
+    label: part,
+    path: parts.slice(0, index + 1).join('/'),
+  }))
 })
 
-const breadcrumbPaths = computed(() => {
-  const paths = []
-  let current = ''
-  for (const part of breadcrumbs.value) {
-    current += (current ? '/' : '') + part
-    paths.push(current)
-  }
-  return paths
+const filteredEntries = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return entries.value
+  return entries.value.filter((entry) => entry.name.toLowerCase().includes(q))
 })
 
-const filteredFiles = computed(() => {
-  if (!searchKeyword.value) return files.value
-  return files.value.filter(f => 
-    f.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-  )
-})
+function fileIcon(entry) {
+  if (entry.isDir) return 'folder'
+  const ext = (entry.extension || '').toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext)) return 'image'
+  if (['js', 'ts', 'vue', 'go', 'php', 'py', 'sh', 'json', 'yml', 'yaml', 'css', 'html'].includes(ext)) return 'code'
+  if (['zip', 'tar', 'gz', 'bz2', 'xz', '7z'].includes(ext)) return 'box'
+  return 'file'
+}
 
-const loadFiles = async () => {
+async function loadPath(path) {
   loading.value = true
+  error.value = ''
+  search.value = ''
   try {
-    const res = await axios.get('/api/files/list', { params: { path: currentPath.value } })
-    files.value = res.data.data || []
-    currentPathAbs.value = res.data.current_path || ''
-    
-    if (history.value[historyIndex.value] !== currentPath.value) {
-      history.value = history.value.slice(0, historyIndex.value + 1)
-      history.value.push(currentPath.value)
-      historyIndex.value++
-    }
-  } catch (err) {
-    ElMessage.error('加载失败: ' + err.message)
+    const res = await fileApi.list(path || '')
+    entries.value = res.data || []
+    currentPath.value = res.relative_path || path || ''
+    currentAbs.value = res.current_path || ''
+  } catch (e) {
+    error.value = errText(e, '读取目录失败')
+    entries.value = []
   } finally {
     loading.value = false
   }
 }
 
-const navigateTo = (path) => {
-  currentPath.value = path
-  loadFiles()
+function goUp() {
+  if (!currentPath.value) return
+  const parts = currentPath.value.split('/').filter(Boolean)
+  parts.pop()
+  loadPath(parts.join('/'))
 }
 
-const goBack = () => {
-  if (canGoBack.value) {
-    historyIndex.value--
-    currentPath.value = history.value[historyIndex.value]
-    loadFiles()
-  }
+function openEntry(entry) {
+  if (entry.isDir) loadPath(entry.path)
+  else openEditor(entry)
 }
 
-const goForward = () => {
-  if (canGoForward.value) {
-    historyIndex.value++
-    currentPath.value = history.value[historyIndex.value]
-    loadFiles()
-  }
-}
-
-const refreshFiles = () => {
-  loadFiles()
-}
-
-const openItem = (item) => {
-  if (item.is_dir) {
-    navigateTo(item.path)
-  } else {
-    editFile(item)
-  }
-}
-
-const editFile = async (item) => {
+async function downloadEntry(entry) {
   try {
-    const res = await axios.get('/api/files/content', { params: { path: item.path } })
-    editContent.value = res.data.content || ''
-    editFilePath.value = item.path
-    editDialogVisible.value = true
-  } catch (err) {
-    ElMessage.error('读取文件失败: ' + err.message)
+    const res = await fileApi.download(entry.path)
+    const url = URL.createObjectURL(res.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = entry.name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    toastError('下载失败', errText(e))
   }
 }
 
-const saveFileContent = async () => {
+function triggerUpload() {
+  uploadInput.value?.click()
+}
+
+async function onUpload(event) {
+  const file = event.target.files && event.target.files[0]
+  if (!file) return
   try {
-    await axios.post('/api/files/content', {
-      path: editFilePath.value,
-      content: editContent.value
-    })
-    ElMessage.success('保存成功')
-    editDialogVisible.value = false
-    loadFiles()
-  } catch (err) {
-    ElMessage.error('保存失败: ' + err.message)
-  }
-}
-
-const handleCreateCommand = (command) => {
-  createType.value = command
-  createName.value = ''
-  createDialogVisible.value = true
-}
-
-const confirmCreate = async () => {
-  if (!createName.value) {
-    ElMessage.warning('请输入名称')
-    return
-  }
-  
-  try {
-    if (createType.value === 'folder') {
-      await axios.post('/api/files/folder', {
-        path: currentPath.value,
-        name: createName.value
-      })
-      ElMessage.success('文件夹创建成功')
-    } else {
-      await axios.post('/api/files/file', {
-        path: currentPath.value,
-        name: createName.value
-      })
-      ElMessage.success('文件创建成功')
-    }
-    createDialogVisible.value = false
-    loadFiles()
-  } catch (err) {
-    ElMessage.error('创建失败: ' + err.message)
-  }
-}
-
-const renameItem = (item) => {
-  renameTarget.value = item
-  renameName.value = item.name
-  renameDialogVisible.value = true
-}
-
-const confirmRename = async () => {
-  if (!renameName.value) {
-    ElMessage.warning('请输入新名称')
-    return
-  }
-  
-  try {
-    await axios.put('/api/files/rename', {
-      path: renameTarget.value.path,
-      new_name: renameName.value
-    })
-    ElMessage.success('重命名成功')
-    renameDialogVisible.value = false
-    loadFiles()
-  } catch (err) {
-    ElMessage.error('重命名失败: ' + err.message)
-  }
-}
-
-const deleteItem = async (item) => {
-  await ElMessageBox.confirm(`确定删除 ${item.name} 吗？`, '警告', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-  
-  try {
-    await axios.delete('/api/files/delete', { params: { path: item.path } })
-    ElMessage.success('已移动到回收站')
-    loadFiles()
-  } catch (err) {
-    ElMessage.error('删除失败: ' + err.message)
-  }
-}
-
-const batchDelete = async () => {
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedFiles.value.length} 个文件吗？`, '警告', {
-    type: 'warning'
-  })
-  
-  for (const item of selectedFiles.value) {
-    try {
-      await axios.delete('/api/files/delete', { params: { path: item.path } })
-    } catch (err) {}
-  }
-  ElMessage.success('已移动到回收站')
-  loadFiles()
-}
-
-const copyItem = (item) => {
-  moveType.value = 'copy'
-  moveTarget.value = item
-  movePath.value = ''
-  moveDialogVisible.value = true
-}
-
-const moveItem = (item) => {
-  moveType.value = 'move'
-  moveTarget.value = item
-  movePath.value = ''
-  moveDialogVisible.value = true
-}
-
-const confirmMove = async () => {
-  if (!movePath.value) {
-    ElMessage.warning('请输入目标路径')
-    return
-  }
-  ElMessage.info(`${moveType.value === 'move' ? '移动' : '复制'}功能开发中`)
-  moveDialogVisible.value = false
-}
-
-const handleFileCommand = (cmd, item) => {
-  switch (cmd) {
-    case 'edit':
-      editFile(item)
-      break
-    case 'download':
-      ElMessage.info('下载功能开发中')
-      break
-    case 'compress':
-      ElMessage.info('压缩功能开发中')
-      break
-  }
-}
-
-const uploadFile = () => {
-  uploadFiles.value = []
-  uploadDrawerVisible.value = true
-}
-
-const handleFilesChange = (file, fileList) => {
-  uploadFiles.value = fileList
-}
-
-const confirmUpload = async () => {
-  if (uploadFiles.value.length === 0) {
-    ElMessage.warning('请选择文件')
-    return
-  }
-  
-  uploading.value = true
-  try {
-    for (const file of uploadFiles.value) {
-      const formData = new FormData()
-      formData.append('file', file.raw)
-      formData.append('path', currentPath.value)
-      await axios.post('/api/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-    }
-    ElMessage.success('上传成功')
-    uploadDrawerVisible.value = false
-    loadFiles()
-  } catch (err) {
-    ElMessage.error('上传失败: ' + err.message)
+    await fileApi.upload(currentPath.value, file)
+    toastSuccess('上传成功', file.name)
+    await loadPath(currentPath.value)
+  } catch (e) {
+    toastError('上传失败', errText(e))
   } finally {
-    uploading.value = false
+    event.target.value = ''
+    clearActionQuery()
   }
 }
 
-const openTerminal = () => {
-  ElMessage.info(`将在 ${currentPathAbs} 路径打开终端`)
+function clearActionQuery() {
+  if (route.query.action === 'upload') {
+    const query = { ...route.query }
+    delete query.action
+    router.replace({ path: route.path, query })
+  }
 }
 
-const openRecycleBin = () => {
-  recycleDrawerVisible.value = true
+// create
+const createOpen = ref(false)
+const createType = ref('folder')
+const createName = ref('')
+const modalError = ref('')
+const submitting = ref(false)
+
+function openCreate(type) {
+  createType.value = type
+  createName.value = ''
+  modalError.value = ''
+  createOpen.value = true
 }
 
-const restoreItem = (item) => {
-  ElMessage.info('还原功能开发中')
+async function submitCreate() {
+  if (submitting.value) return
+  modalError.value = ''
+  if (!createName.value.trim()) {
+    modalError.value = '请输入名称'
+    return
+  }
+  submitting.value = true
+  try {
+    if (createType.value === 'folder') await fileApi.folder(currentPath.value, createName.value.trim())
+    else await fileApi.file(currentPath.value, createName.value.trim())
+    toastSuccess('创建成功', createName.value)
+    createOpen.value = false
+    await loadPath(currentPath.value)
+  } catch (e) {
+    modalError.value = errText(e, '创建失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
-const permanentDelete = (item) => {
-  ElMessageBox.confirm(`确定彻底删除 ${item.name} 吗？`, '警告', { type: 'warning' })
-    .then(() => {
-      ElMessage.success('已彻底删除')
-    })
-    .catch(() => {})
+// rename
+const renameOpen = ref(false)
+const renameTarget = ref(null)
+const renameName = ref('')
+
+function openRename(entry) {
+  renameTarget.value = entry
+  renameName.value = entry.name
+  modalError.value = ''
+  renameOpen.value = true
 }
 
-const emptyRecycleBin = () => {
-  ElMessageBox.confirm('确定清空回收站吗？此操作不可恢复！', '警告', { type: 'warning' })
-    .then(() => {
-      ElMessage.success('回收站已清空')
-    })
-    .catch(() => {})
+async function submitRename() {
+  if (submitting.value || !renameTarget.value) return
+  modalError.value = ''
+  if (!renameName.value.trim()) {
+    modalError.value = '请输入新名称'
+    return
+  }
+  submitting.value = true
+  try {
+    await fileApi.rename(renameTarget.value.path, renameName.value.trim())
+    toastSuccess('重命名成功')
+    renameOpen.value = false
+    await loadPath(currentPath.value)
+  } catch (e) {
+    modalError.value = errText(e, '重命名失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleSelectionChange = (selection) => {
-  selectedFiles.value = selection
+// delete
+const deleteOpen = ref(false)
+const deleteTarget = ref(null)
+
+function openDelete(entry) {
+  deleteTarget.value = entry
+  deleteOpen.value = true
 }
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+async function submitDelete() {
+  if (submitting.value || !deleteTarget.value) return
+  submitting.value = true
+  try {
+    await fileApi.remove(deleteTarget.value.path)
+    toastSuccess('删除成功', deleteTarget.value.name)
+    deleteOpen.value = false
+    await loadPath(currentPath.value)
+  } catch (e) {
+    toastError('删除失败', errText(e))
+  } finally {
+    submitting.value = false
+  }
 }
 
-const getFileIcon = (ext) => {
-  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp']
-  const videoExts = ['mp4', 'avi', 'mkv', 'mov', 'wmv']
-  const audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg']
-  
-  if (imageExts.includes(ext)) return Picture
-  if (videoExts.includes(ext)) return VideoCamera
-  if (audioExts.includes(ext)) return Headset
-  if (ext === 'txt' || ext === 'md' || ext === 'json') return Document
-  return Files
+// editor
+const editorOpen = ref(false)
+const editorLoading = ref(false)
+const editorEntry = ref(null)
+const editorContent = ref('')
+
+async function openEditor(entry) {
+  editorEntry.value = entry
+  editorContent.value = ''
+  modalError.value = ''
+  editorOpen.value = true
+  editorLoading.value = true
+  try {
+    const res = await fileApi.content(entry.path)
+    editorContent.value = res.content || ''
+  } catch (e) {
+    modalError.value = errText(e, '读取文件失败')
+  } finally {
+    editorLoading.value = false
+  }
 }
 
-onMounted(() => {
-  loadFiles()
+async function submitEditor() {
+  if (submitting.value || !editorEntry.value) return
+  modalError.value = ''
+  submitting.value = true
+  try {
+    await fileApi.save(editorEntry.value.path, editorContent.value)
+    toastSuccess('文件已保存', editorEntry.value.name)
+    editorOpen.value = false
+    await loadPath(currentPath.value)
+  } catch (e) {
+    modalError.value = errText(e, '保存失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+watch(
+  () => route.query.action,
+  (action) => {
+    if (action === 'upload') setTimeout(triggerUpload, 100)
+  }
+)
+
+onMounted(async () => {
+  try {
+    const res = await fileApi.root()
+    rootPath.value = res.root || '/'
+  } catch (e) {
+    /* 忽略 */
+  }
+  await loadPath('')
+  if (route.query.action === 'upload') setTimeout(triggerUpload, 150)
 })
 </script>
 
 <style scoped>
-.files-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.top-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 8px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.top-left {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.top-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.breadcrumb-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 8px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.breadcrumb-content {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  color: #6b7280;
-}
-
-.breadcrumb-item:hover {
-  color: #477779;
-}
-
-.breadcrumb-item.active {
-  color: #477779;
-  font-weight: 500;
-}
-
-.separator {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.path-info {
-  font-size: 11px;
-  color: #9ca3af;
-  font-family: monospace;
-}
-
-.files-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.file-name {
+.file-open {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
+  max-width: 360px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  text-align: left;
 }
 
-.file-name:hover {
-  color: #477779;
+.file-open:hover {
+  color: var(--color-primary);
 }
 
-.upload-area {
-  margin-bottom: 16px;
-}
-
-.upload-icon {
-  font-size: 48px;
-  color: #9ca3af;
-}
-
-.upload-text {
-  margin-top: 8px;
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.upload-hint {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 4px;
-}
-
-.upload-footer {
+.file-open__icon {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 16px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
 }
 
-.move-path {
-  margin-bottom: 12px;
+.file-open__icon--dir {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
-.move-tip {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.recycle-content {
-  padding: 8px 0;
-}
-
-.recycle-footer {
-  margin-top: 16px;
-  text-align: center;
+a.btn {
+  text-decoration: none;
 }
 </style>

@@ -1,900 +1,404 @@
 <template>
-  <div class="security-container">
-    <!-- 顶部分类面板 -->
-    <div class="top-panel">
-      <div class="top-left">
-        <el-button type="primary" @click="saveAllSettings" :loading="saving">
-          <el-icon><Check /></el-icon> 保存设置
-        </el-button>
-        <el-button @click="refreshSettings">
-          <el-icon><Refresh /></el-icon> 刷新
-        </el-button>
+  <div class="page">
+    <header class="page__header">
+      <div>
+        <div class="page__title-row">
+          <h1 class="page__title">安全中心</h1>
+          <UStatusDot
+            :status="riskCount === 0 ? 'running' : 'warning'"
+            :text="riskCount === 0 ? '基线良好' : `${riskCount} 项待处理`"
+          />
+        </div>
+        <p class="page__subtitle">安全基线检查、登录审计与防火墙状态（只读）</p>
       </div>
-      <div class="top-right">
-        <el-tabs v-model="activeTab" class="security-tabs">
-          <el-tab-pane name="overview">
-            <template #label>
-              <span><el-icon><DataAnalysis /></el-icon> 安全概览</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="firewall">
-            <template #label>
-              <span><el-icon><Lock /></el-icon> 防火墙</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="ssh">
-            <template #label>
-              <span><el-icon><Monitor /></el-icon> SSH安全</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="login">
-            <template #label>
-              <span><el-icon><User /></el-icon> 登录保护</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="fail2ban">
-            <template #label>
-              <span><el-icon><Warning /></el-icon> Fail2ban</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="ssl">
-            <template #label>
-              <span><el-icon><Connection /></el-icon> SSL证书</span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="backup">
-            <template #label>
-              <span><el-icon><Files /></el-icon> 安全备份</span>
-            </template>
-          </el-tab-pane>
-        </el-tabs>
+      <div class="page__actions">
+        <UButton icon="refresh" label="刷新" :loading="loading" @click="loadAll" />
+        <UButton icon="key" label="修改密码" @click="openPassword" />
+        <UButton variant="primary" icon="settings" label="面板设置" @click="go('/settings')" />
       </div>
+    </header>
+
+    <div v-if="error" class="alert alert--danger" role="alert">
+      <UIcon name="alert" :size="16" class="alert__icon" />
+      <div class="alert__body">{{ error }}</div>
     </div>
 
-    <!-- 安全概览 -->
-    <div class="content-panel" v-if="activeTab === 'overview'">
-      <!-- 统计卡片 -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #e8f4f4;">
-            <el-icon color="#477779"><Warning /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-number">{{ stats.totalAttacks }}</div>
-            <div class="stat-label">今日攻击</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #e8f4e8;">
-            <el-icon color="#2e7d32"><Lock /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-number">{{ stats.blockedIps }}</div>
-            <div class="stat-label">已封禁IP</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #fef3e8;">
-            <el-icon color="#ed6c02"><Monitor /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-number">{{ stats.scanAttempts }}</div>
-            <div class="stat-label">扫描尝试</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #f3e8f4;">
-            <el-icon color="#7b1fa2"><Connection /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-number">{{ stats.sslCerts }}</div>
-            <div class="stat-label">SSL证书</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 世界地图 -->
-      <div class="map-section">
-        <div class="section-header">
-          <h3 class="section-title">攻击来源分布</h3>
-          <div class="map-controls">
-            <el-radio-group v-model="mapDataType" size="small">
-              <el-radio-button label="attacks">攻击次数</el-radio-button>
-              <el-radio-button label="ips">来源IP</el-radio-button>
-            </el-radio-group>
-          </div>
-        </div>
-        <div ref="mapChartRef" class="map-container"></div>
-      </div>
-
-      <!-- 攻击趋势图 -->
-      <div class="chart-section">
-        <div class="section-header">
-          <h3 class="section-title">攻击趋势</h3>
-          <el-select v-model="trendDays" size="small" style="width: 100px">
-            <el-option label="最近7天" :value="7" />
-            <el-option label="最近30天" :value="30" />
-            <el-option label="最近90天" :value="90" />
-          </el-select>
-        </div>
-        <div ref="trendChartRef" class="trend-container"></div>
-      </div>
-
-      <!-- 攻击类型分布和最近事件 -->
-      <div class="two-columns">
-        <div class="column">
-          <div class="section-header">
-            <h3 class="section-title">攻击类型分布</h3>
-          </div>
-          <div ref="typeChartRef" class="type-container"></div>
-        </div>
-        <div class="column">
-          <div class="section-header">
-            <h3 class="section-title">最近安全事件</h3>
-            <el-button size="small" @click="clearEvents">清空</el-button>
-          </div>
-          <div class="events-list">
-            <div v-for="event in recentEvents" :key="event.id" class="event-item" :class="event.level">
-              <div class="event-time">{{ event.time }}</div>
-              <div class="event-content">
-                <span class="event-type">{{ event.type }}</span>
-                <span class="event-desc">{{ event.description }}</span>
-              </div>
-              <div class="event-ip">{{ event.ip }}</div>
-            </div>
-            <div v-if="recentEvents.length === 0" class="empty">暂无安全事件</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 实时流量监控 -->
-      <div class="chart-section">
-        <div class="section-header">
-          <h3 class="section-title">实时流量监控</h3>
-          <el-button size="small" @click="startRealTime" :loading="realtimeLoading">开始监控</el-button>
-        </div>
-        <div ref="trafficChartRef" class="traffic-container"></div>
-      </div>
-    </div>
-
-    <!-- 防火墙设置 -->
-    <div class="content-panel" v-if="activeTab === 'firewall'">
-      <!-- 防火墙设置内容保持不变 -->
-      <div class="settings-section">
-        <div class="section-header">
-          <h3 class="section-title">防火墙状态</h3>
-          <el-switch v-model="firewallForm.enabled" />
-        </div>
-        <div class="section-desc">控制系统的防火墙开关，关闭后所有端口都将开放</div>
-      </div>
-
-      <div class="settings-section">
-        <h3 class="section-title">端口规则</h3>
-        <div class="port-rules">
-          <div class="rule-header">
-            <span>端口</span>
-            <span>协议</span>
-            <span>来源IP</span>
-            <span>操作</span>
-          </div>
-          <div v-for="(rule, idx) in firewallForm.rules" :key="idx" class="rule-row">
-            <el-input v-model="rule.port" placeholder="80" size="small" style="width: 120px" />
-            <el-select v-model="rule.protocol" size="small" style="width: 100px">
-              <el-option label="TCP" value="tcp" />
-              <el-option label="UDP" value="udp" />
-              <el-option label="TCP+UDP" value="both" />
-            </el-select>
-            <el-input v-model="rule.source" placeholder="0.0.0.0/0" size="small" style="width: 150px" />
-            <div class="rule-actions">
-              <el-button size="small" text @click="addPortRule">+</el-button>
-              <el-button size="small" text type="danger" @click="removePortRule(idx)">-</el-button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3 class="section-title">IP黑白名单</h3>
-        <el-tabs v-model="ipListType" class="ip-tabs">
-          <el-tab-pane label="黑名单" name="blacklist">
-            <div class="ip-list">
-              <div v-for="(ip, idx) in firewallForm.blacklist" :key="idx" class="ip-item">
-                <span>{{ ip }}</span>
-                <el-button size="small" text type="danger" @click="removeBlacklist(idx)">删除</el-button>
-              </div>
-              <div class="add-ip">
-                <el-input v-model="newBlacklistIp" placeholder="输入IP地址" size="small" style="width: 200px" />
-                <el-button size="small" @click="addBlacklist">添加</el-button>
+    <UTabs v-model="activeTab" :tabs="tabs" aria-label="安全中心标签页">
+      <div v-if="activeTab === 'overview'" class="stack">
+        <div class="widget-grid">
+          <UWidget title="安全基线" subtitle="逐项检查面板常见风险" icon="shield" :span="7">
+            <div class="checklist">
+              <div v-for="check in checks" :key="check.id" class="checklist__item">
+                <span
+                  class="checklist__icon"
+                  :class="check.ok ? 'checklist__icon--ok' : 'checklist__icon--warn'"
+                >
+                  <UIcon :name="check.ok ? 'check' : 'alert'" :size="13" />
+                </span>
+                <div class="checklist__body">
+                  <p class="checklist__title">{{ check.title }}</p>
+                  <p class="checklist__desc">{{ check.detail }}</p>
+                </div>
+                <span :class="['badge', check.ok ? 'badge--success' : 'badge--warning']">
+                  {{ check.ok ? '通过' : '待处理' }}
+                </span>
               </div>
             </div>
-          </el-tab-pane>
-          <el-tab-pane label="白名单" name="whitelist">
-            <div class="ip-list">
-              <div v-for="(ip, idx) in firewallForm.whitelist" :key="idx" class="ip-item">
-                <span>{{ ip }}</span>
-                <el-button size="small" text type="danger" @click="removeWhitelist(idx)">删除</el-button>
+          </UWidget>
+
+          <UWidget title="登录与风险" subtitle="最近 24 小时" icon="user" :span="5">
+            <div class="stat-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr))">
+              <div class="stat">
+                <p class="stat__label">登录失败</p>
+                <p class="stat__value">{{ stats.failures24h || 0 }}</p>
+                <p class="stat__meta">失败会被限流并记录</p>
               </div>
-              <div class="add-ip">
-                <el-input v-model="newWhitelistIp" placeholder="输入IP地址" size="small" style="width: 200px" />
-                <el-button size="small" @click="addWhitelist">添加</el-button>
+              <div class="stat">
+                <p class="stat__label">登录成功</p>
+                <p class="stat__value">{{ stats.successes24h || 0 }}</p>
+                <p class="stat__meta">最近登录见审计</p>
               </div>
             </div>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
-    </div>
+            <div v-if="overview && overview.warnings && overview.warnings.length" class="warning-list" style="margin-top: 12px">
+              <div v-for="(warning, index) in overview.warnings" :key="index" class="warning-item">
+                <UIcon name="alert" :size="15" />
+                <span>{{ warning }}</span>
+              </div>
+            </div>
+            <div v-else class="alert alert--success" style="margin-top: 12px">
+              <UIcon name="check-circle" :size="16" class="alert__icon" />
+              <div class="alert__body">未发现明显风险项</div>
+            </div>
+          </UWidget>
 
-    <!-- SSH安全设置（简化） -->
-    <div class="content-panel" v-if="activeTab === 'ssh'">
-      <div class="settings-section">
-        <h3 class="section-title">SSH服务设置</h3>
-        <el-form label-width="140px">
-          <el-form-item label="SSH端口">
-            <el-input-number v-model="sshForm.port" :min="1" :max="65535" />
-          </el-form-item>
-          <el-form-item label="允许密码登录">
-            <el-switch v-model="sshForm.passwordAuth" />
-          </el-form-item>
-          <el-form-item label="允许Root登录">
-            <el-switch v-model="sshForm.rootLogin" />
-          </el-form-item>
-          <el-form-item label="空闲超时">
-            <el-input-number v-model="sshForm.idleTimeout" :min="0" :max="3600" /> 秒
-          </el-form-item>
-        </el-form>
-      </div>
-    </div>
+          <UWidget title="HTTPS 覆盖" subtitle="站点证书状态" icon="ssl" :span="4">
+            <div class="stack">
+              <div class="monitor__big">{{ httpsRatio }}%</div>
+              <div class="meter">
+                <div class="meter__track">
+                  <div
+                    class="meter__fill"
+                    :class="httpsRatio === 100 ? 'meter__fill--success' : 'meter__fill--warning'"
+                    :style="{ width: `${httpsRatio}%` }"
+                  />
+                </div>
+                <p class="meter__meta">
+                  {{ overview?.httpsSites || 0 }} / {{ overview?.totalSites || 0 }} 个站点已启用 SSL
+                </p>
+              </div>
+              <UButton variant="secondary" size="sm" icon="ssl" label="管理证书" @click="go('/websites?tab=ssl')" />
+            </div>
+          </UWidget>
 
-    <!-- 登录保护设置（简化） -->
-    <div class="content-panel" v-if="activeTab === 'login'">
-      <div class="settings-section">
-        <h3 class="section-title">登录限制</h3>
-        <el-form label-width="160px">
-          <el-form-item label="登录失败限制">
-            <el-switch v-model="loginForm.loginLimit" />
-          </el-form-item>
-          <el-form-item label="最大失败次数" v-if="loginForm.loginLimit">
-            <el-input-number v-model="loginForm.maxAttempts" :min="1" :max="20" /> 次
-          </el-form-item>
-          <el-form-item label="锁定时长" v-if="loginForm.loginLimit">
-            <el-input-number v-model="loginForm.lockMinutes" :min="1" :max="60" /> 分钟
-          </el-form-item>
-        </el-form>
-      </div>
-    </div>
+          <UWidget title="SSH 安全" subtitle="sshd 配置只读检查" icon="terminal" :span="4">
+            <div class="stack">
+              <div class="row">
+                <UStatusDot
+                  :status="overview?.ssh?.serviceActive ? 'running' : 'warning'"
+                  :text="overview?.ssh?.serviceActive ? `运行中 · ${overview?.ssh?.port}` : '未检测到服务'"
+                />
+              </div>
+              <dl class="info-list">
+                <div class="info-list__row">
+                  <dt class="info-list__label">密码登录</dt>
+                  <dd class="info-list__value">{{ overview?.ssh?.passwordAuthentication || '—' }}</dd>
+                </div>
+                <div class="info-list__row">
+                  <dt class="info-list__label">root 登录</dt>
+                  <dd class="info-list__value">{{ overview?.ssh?.permitRootLogin || '—' }}</dd>
+                </div>
+              </dl>
+              <UButton variant="secondary" size="sm" icon="terminal" label="查看详情" @click="go('/ssh')" />
+            </div>
+          </UWidget>
 
-    <!-- Fail2ban设置（简化） -->
-    <div class="content-panel" v-if="activeTab === 'fail2ban'">
-      <div class="settings-section">
-        <div class="section-header">
-          <h3 class="section-title">Fail2ban状态</h3>
-          <el-switch v-model="fail2banForm.enabled" />
+          <UWidget title="防火墙" subtitle="只读状态" icon="shield" :span="4">
+            <div class="stack">
+              <div class="row">
+                <UStatusDot
+                  :status="overview?.firewall?.active ? 'running' : 'warning'"
+                  :text="overview?.firewall?.active ? `${overview?.firewall?.backend} 已启用` : '未检测到已启用防火墙'"
+                />
+              </div>
+              <p class="muted" style="font-size: 12px">
+                {{ overview?.firewall?.error || `规则数：${overview?.firewall?.rules?.length || 0}` }}
+              </p>
+              <UButton variant="secondary" size="sm" icon="shield" label="查看规则" @click="activeTab = 'firewall'" />
+            </div>
+          </UWidget>
         </div>
-        <el-form label-width="160px">
-          <el-form-item label="最大尝试次数">
-            <el-input-number v-model="fail2banForm.maxRetry" :min="1" :max="10" /> 次
-          </el-form-item>
-          <el-form-item label="封禁时间">
-            <el-input-number v-model="fail2banForm.banTime" :min="60" :max="86400" /> 秒
-          </el-form-item>
-        </el-form>
       </div>
-    </div>
 
-    <!-- SSL证书设置（简化） -->
-    <div class="content-panel" v-if="activeTab === 'ssl'">
-      <div class="settings-section">
-        <h3 class="section-title">证书管理</h3>
-        <el-table :data="sslForm.certificates" stripe style="width: 100%">
-          <el-table-column prop="domain" label="域名" width="200" />
-          <el-table-column prop="issuer" label="颁发机构" width="150" />
-          <el-table-column prop="expireDate" label="过期时间" width="180" />
-          <el-table-column label="操作" width="150">
-            <template #default="{ row }">
-              <el-button size="small" @click="renewCert(row)">续期</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+      <div v-else-if="activeTab === 'audit'" class="stack">
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <span class="chip">失败 {{ stats.failures24h || 0 }}</span>
+            <span class="chip">成功 {{ stats.successes24h || 0 }}</span>
+          </div>
+          <div class="toolbar__right">
+            <UButton icon="refresh" label="刷新" :loading="loading" @click="loadAll" />
+          </div>
+        </div>
+        <div v-if="audit.length === 0" class="table-wrap">
+          <UEmpty icon="user" title="暂无登录记录" description="登录成功或失败后会记录 IP、时间和结果。" />
+        </div>
+        <div v-else class="table-wrap">
+          <table class="table">
+            <caption class="sr-only">登录审计记录</caption>
+            <thead>
+              <tr>
+                <th scope="col">时间</th>
+                <th scope="col">结果</th>
+                <th scope="col">用户名</th>
+                <th scope="col">来源 IP</th>
+                <th scope="col">原因</th>
+                <th scope="col">User-Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(entry, index) in audit" :key="index">
+                <td class="muted nowrap">{{ formatDate(entry.time) }}</td>
+                <td>
+                  <UStatusDot :status="entry.success ? 'running' : 'error'" :text="entry.success ? '成功' : '失败'" />
+                </td>
+                <td class="mono">{{ entry.username || '—' }}</td>
+                <td class="mono">{{ entry.ip || '—' }}</td>
+                <td class="muted">{{ entry.reason || '—' }}</td>
+                <td class="muted truncate" style="max-width: 260px">{{ entry.userAgent || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert--info">
+          <UIcon name="info" :size="16" class="alert__icon" />
+          <div class="alert__body">审计记录保存在 <code class="code--inline">data/logs/auth.log</code>，最多保留最近 500 条到内存。</div>
+        </div>
       </div>
-    </div>
 
-    <!-- 安全备份（简化） -->
-    <div class="content-panel" v-if="activeTab === 'backup'">
-      <div class="settings-section">
-        <h3 class="section-title">安全配置备份</h3>
-        <el-form label-width="140px">
-          <el-form-item>
-            <el-button @click="backupNow" :loading="backingUp">立即备份</el-button>
-          </el-form-item>
-        </el-form>
+      <div v-else class="stack">
+        <div class="widget-grid">
+          <UWidget title="防火墙状态" subtitle="只读检查，不提供修改操作" icon="shield" :span="12">
+            <div class="stack">
+              <div class="row">
+                <UStatusDot
+                  :status="overview?.firewall?.active ? 'running' : 'warning'"
+                  :text="overview?.firewall?.active ? '已启用' : '未启用或不可用'"
+                />
+                <span class="badge">{{ overview?.firewall?.backend || 'none' }}</span>
+              </div>
+              <div v-if="overview?.firewall?.error" class="alert alert--warning">
+                <UIcon name="alert" :size="16" class="alert__icon" />
+                <div class="alert__body">{{ overview.firewall.error }}</div>
+              </div>
+              <pre v-if="overview?.firewall?.summary" class="log log--light">{{ overview.firewall.summary }}</pre>
+              <div v-else class="empty" style="padding: 22px">
+                <p class="empty__title">没有可显示的防火墙信息</p>
+                <p class="empty__desc">面板会尝试读取 ufw / firewalld / nftables 的状态。</p>
+              </div>
+              <div class="alert alert--info">
+                <UIcon name="info" :size="16" class="alert__icon" />
+                <div class="alert__body">
+                  云服务器通常由安全组控制入站规则，本页只展示系统防火墙状态，修改请使用 SSH 或云控制台。
+                </div>
+              </div>
+            </div>
+          </UWidget>
+        </div>
       </div>
-    </div>
+    </UTabs>
+
+    <!-- 修改密码 -->
+    <UModal v-model="passwordOpen" title="修改管理员密码" description="修改成功后所有已登录会话会立即失效" size="md" :busy="passwordSubmitting">
+      <form id="password-form" class="stack" @submit.prevent="submitPassword">
+        <div v-if="passwordError" class="alert alert--danger" role="alert">
+          <UIcon name="alert" :size="16" class="alert__icon" />
+          <div class="alert__body">{{ passwordError }}</div>
+        </div>
+        <UField label="当前密码" for-id="old-password" required>
+          <UInput id="old-password" v-model="passwordForm.oldPassword" type="password" revealable autocomplete="current-password" />
+        </UField>
+        <UField label="新密码" for-id="new-password" required hint="至少 8 位，必须同时包含字母和数字">
+          <UInput id="new-password" v-model="passwordForm.newPassword" type="password" revealable autocomplete="new-password" />
+        </UField>
+        <UField label="确认新密码" for-id="confirm-password" required>
+          <UInput id="confirm-password" v-model="passwordForm.confirmPassword" type="password" revealable autocomplete="new-password" />
+        </UField>
+        <div class="alert alert--warning">
+          <UIcon name="alert" :size="16" class="alert__icon" />
+          <div class="alert__body">修改密码后需要重新登录。若忘记密码，可在服务器执行 <code class="code--inline">up 9 password 新密码</code>。</div>
+        </div>
+      </form>
+      <template #footer>
+        <UButton variant="secondary" @click="passwordOpen = false">取消</UButton>
+        <UButton variant="primary" :loading="passwordSubmitting" icon="key" label="修改密码" @click="submitPassword" />
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Refresh, Lock, Monitor, User, Warning, Connection, Files, DataAnalysis } from '@element-plus/icons-vue'
-import * as echarts from 'echarts'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import UButton from '@/components/ui/UButton.vue'
+import UEmpty from '@/components/ui/UEmpty.vue'
+import UField from '@/components/ui/UField.vue'
+import UIcon from '@/components/ui/UIcon.vue'
+import UInput from '@/components/ui/UInput.vue'
+import UModal from '@/components/ui/UModal.vue'
+import UStatusDot from '@/components/ui/UStatusDot.vue'
+import UTabs from '@/components/ui/UTabs.vue'
+import UWidget from '@/components/ui/UWidget.vue'
+import { authApi, errText, securityApi } from '@/api'
+import { useAuth } from '@/composables/useAuth'
+import { formatDate } from '@/composables/useFormat'
+import { toastError, toastSuccess } from '@/composables/useToast'
 
-const activeTab = ref('overview')
-const ipListType = ref('blacklist')
-const saving = ref(false)
-const backingUp = ref(false)
-const mapDataType = ref('attacks')
-const trendDays = ref(7)
-const realtimeLoading = ref(false)
+const route = useRoute()
+const router = useRouter()
+const { clear } = useAuth()
 
-// 图表实例
-const mapChartRef = ref(null)
-const trendChartRef = ref(null)
-const typeChartRef = ref(null)
-const trafficChartRef = ref(null)
-let mapChart = null
-let trendChart = null
-let typeChart = null
-let trafficChart = null
-let realtimeInterval = null
+const loading = ref(false)
+const error = ref('')
+const overview = ref(null)
+const audit = ref([])
+const stats = ref({})
+const activeTab = ref(['overview', 'audit', 'firewall'].includes(route.query.tab) ? route.query.tab : 'overview')
+const tabs = [
+  { id: 'overview', label: '概览', icon: 'shield' },
+  { id: 'audit', label: '登录审计', icon: 'user' },
+  { id: 'firewall', label: '防火墙', icon: 'network' },
+]
 
-// 统计数据
-const stats = ref({
-  totalAttacks: 1234,
-  blockedIps: 56,
-  scanAttempts: 789,
-  sslCerts: 3
+const httpsRatio = computed(() => {
+  if (!overview.value || !overview.value.totalSites) return 0
+  return Math.round((overview.value.httpsSites / overview.value.totalSites) * 100)
 })
 
-// 世界地图数据
-const attackMapData = ref([
-  { name: 'China', value: 456 },
-  { name: 'United States', value: 234 },
-  { name: 'Russia', value: 123 },
-  { name: 'Germany', value: 89 },
-  { name: 'France', value: 67 },
-  { name: 'United Kingdom', value: 56 },
-  { name: 'Japan', value: 45 },
-  { name: 'South Korea', value: 34 },
-  { name: 'Brazil', value: 23 },
-  { name: 'India', value: 12 }
-])
-
-// 趋势数据
-const trendData = ref({
-  dates: ['01-10', '01-11', '01-12', '01-13', '01-14', '01-15', '01-16'],
-  attacks: [45, 52, 38, 65, 43, 58, 48],
-  blocks: [12, 15, 8, 22, 10, 18, 14]
-})
-
-// 攻击类型数据
-const attackTypeData = ref([
-  { name: '暴力破解', value: 345 },
-  { name: 'DDoS攻击', value: 234 },
-  { name: 'SQL注入', value: 123 },
-  { name: 'XSS攻击', value: 89 },
-  { name: 'CC攻击', value: 67 }
-])
-
-// 最近事件
-const recentEvents = ref([
-  { id: 1, time: '10:23:45', type: '暴力破解', description: '来自 203.0.113.50 的多次登录尝试', ip: '203.0.113.50', level: 'high' },
-  { id: 2, time: '09:15:22', type: '端口扫描', description: '检测到端口扫描行为', ip: '185.45.12.3', level: 'medium' },
-  { id: 3, time: '08:30:10', type: '异常请求', description: '异常请求模式检测', ip: '104.28.16.5', level: 'low' }
-])
-
-// 防火墙表单
-const firewallForm = reactive({
-  enabled: true,
-  rules: [
-    { port: '22', protocol: 'tcp', source: '0.0.0.0/0' },
-    { port: '80', protocol: 'tcp', source: '0.0.0.0/0' },
-    { port: '443', protocol: 'tcp', source: '0.0.0.0/0' }
-  ],
-  blacklist: [],
-  whitelist: ['192.168.1.0/24']
-})
-
-const newBlacklistIp = ref('')
-const newWhitelistIp = ref('')
-
-// SSH表单
-const sshForm = reactive({
-  port: 22,
-  passwordAuth: true,
-  rootLogin: true,
-  idleTimeout: 300
-})
-
-// 登录保护表单
-const loginForm = reactive({
-  loginLimit: true,
-  maxAttempts: 5,
-  lockMinutes: 15
-})
-
-// Fail2ban表单
-const fail2banForm = reactive({
-  enabled: true,
-  maxRetry: 3,
-  banTime: 600
-})
-
-// SSL表单
-const sslForm = reactive({
-  certificates: [
-    { domain: 'example.com', issuer: "Let's Encrypt", expireDate: '2025-01-15' }
+const checks = computed(() => {
+  const o = overview.value || {}
+  const ssh = o.ssh || {}
+  return [
+    {
+      id: 'entry',
+      title: '安全入口',
+      detail: o.securityEntry ? `已启用：${o.securityEntry}` : '未启用，登录页对公网可见',
+      ok: !!o.securityEntry,
+    },
+    {
+      id: 'bind',
+      title: '面板监听地址',
+      detail: o.bindIP && o.bindIP !== '0.0.0.0' ? `仅监听 ${o.bindIP}` : '监听所有网卡，建议限制来源 IP',
+      ok: o.bindIP && o.bindIP !== '0.0.0.0',
+    },
+    {
+      id: 'https',
+      title: 'HTTPS 覆盖',
+      detail: !o.totalSites ? '尚无站点' : `${o.httpsSites || 0}/${o.totalSites} 个站点启用 SSL`,
+      ok: !o.totalSites || o.httpsSites === o.totalSites,
+    },
+    {
+      id: 'initial-password',
+      title: '初始密码文件',
+      detail: o.initialPasswordExists ? 'data/initial-password.txt 仍存在，请删除' : '未发现残留密码文件',
+      ok: !o.initialPasswordExists,
+    },
+    {
+      id: 'firewall',
+      title: '系统防火墙',
+      detail: o.firewall?.active ? `${o.firewall.backend} 已启用` : '未检测到启用的 ufw/firewalld',
+      ok: !!o.firewall?.active,
+    },
+    {
+      id: 'ssh',
+      title: 'SSH 配置',
+      detail: ssh.error || `${ssh.port || '22'} 端口 · 密码登录 ${ssh.passwordAuthentication || '—'}`,
+      ok: !ssh.error && ssh.installed && (!ssh.warnings || ssh.warnings.length === 0),
+    },
   ]
 })
 
-// 初始化地图
-const initMapChart = () => {
-  if (!mapChartRef.value) return
-  if (mapChart) mapChart.dispose()
-  
-  mapChart = echarts.init(mapChartRef.value)
-  mapChart.setOption({
-    title: { show: false },
-    tooltip: { trigger: 'item' },
-    visualMap: {
-      min: 0,
-      max: 500,
-      left: 'left',
-      top: 'bottom',
-      calculable: true,
-      inRange: { color: ['#e8f4f4', '#477779', '#2d5a5c'] }
-    },
-    series: [{
-      name: '攻击来源',
-      type: 'map',
-      map: 'world',
-      roam: true,
-      data: attackMapData.value,
-      label: { show: false },
-      emphasis: { label: { show: true } }
-    }]
-  })
-}
+const riskCount = computed(() => checks.value.filter((check) => !check.ok).length)
 
-// 初始化趋势图
-const initTrendChart = () => {
-  if (!trendChartRef.value) return
-  if (trendChart) trendChart.dispose()
-  
-  trendChart = echarts.init(trendChartRef.value)
-  trendChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['攻击次数', '封禁IP'], bottom: 0 },
-    grid: { left: '3%', right: '4%', top: '10%', bottom: '10%', containLabel: true },
-    xAxis: { type: 'category', data: trendData.value.dates },
-    yAxis: { type: 'value' },
-    series: [
-      { name: '攻击次数', type: 'line', smooth: true, data: trendData.value.attacks, lineStyle: { color: '#c62828' }, areaStyle: { opacity: 0.3, color: '#c62828' } },
-      { name: '封禁IP', type: 'line', smooth: true, data: trendData.value.blocks, lineStyle: { color: '#477779' }, areaStyle: { opacity: 0.3, color: '#477779' } }
-    ]
-  })
-}
-
-// 初始化攻击类型饼图
-const initTypeChart = () => {
-  if (!typeChartRef.value) return
-  if (typeChart) typeChart.dispose()
-  
-  typeChart = echarts.init(typeChartRef.value)
-  typeChart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{
-      type: 'pie',
-      radius: '50%',
-      data: attackTypeData.value,
-      emphasis: { scale: true },
-      label: { show: true, formatter: '{b}: {d}%' },
-      color: ['#c62828', '#ed6c02', '#477779', '#7b1fa2', '#2e7d32']
-    }]
-  })
-}
-
-// 初始化流量图
-const initTrafficChart = () => {
-  if (!trafficChartRef.value) return
-  if (trafficChart) trafficChart.dispose()
-  
-  trafficChart = echarts.init(trafficChartRef.value)
-  trafficChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['入站流量', '出站流量'], bottom: 0 },
-    grid: { left: '3%', right: '4%', top: '10%', bottom: '10%', containLabel: true },
-    xAxis: { type: 'category', data: Array.from({ length: 60 }, (_, i) => `${i}s`) },
-    yAxis: { type: 'value', name: 'Mbps' },
-    series: [
-      { name: '入站流量', type: 'line', smooth: true, data: Array.from({ length: 60 }, () => Math.random() * 100), lineStyle: { color: '#477779' }, areaStyle: { opacity: 0.3 } },
-      { name: '出站流量', type: 'line', smooth: true, data: Array.from({ length: 60 }, () => Math.random() * 80), lineStyle: { color: '#ed6c02' }, areaStyle: { opacity: 0.3 } }
-    ]
-  })
-}
-
-// 开始实时监控
-const startRealTime = () => {
-  if (realtimeInterval) clearInterval(realtimeInterval)
-  realtimeLoading.value = true
-  
-  setTimeout(() => {
-    realtimeInterval = setInterval(() => {
-      if (trafficChart) {
-        const newInbound = Math.random() * 100
-        const newOutbound = Math.random() * 80
-        const option = trafficChart.getOption()
-        const inboundData = option.series[0].data
-        const outboundData = option.series[1].data
-        inboundData.push(newInbound)
-        outboundData.push(newOutbound)
-        if (inboundData.length > 60) inboundData.shift()
-        if (outboundData.length > 60) outboundData.shift()
-        trafficChart.setOption({ series: [{ data: inboundData }, { data: outboundData }] })
-      }
-    }, 1000)
-    realtimeLoading.value = false
-    ElMessage.success('实时监控已启动')
-  }, 500)
-}
-
-// 保存设置
-const saveAllSettings = async () => {
-  saving.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  ElMessage.success('设置已保存')
-  saving.value = false
-}
-
-const refreshSettings = () => {
-  ElMessage.success('刷新成功')
-  // 刷新图表数据
-  // initMapChart()
-  initTrendChart()
-  initTypeChart()
-}
-
-// 防火墙操作
-const addPortRule = () => {
-  firewallForm.rules.push({ port: '', protocol: 'tcp', source: '0.0.0.0/0' })
-}
-
-const removePortRule = (idx) => {
-  firewallForm.rules.splice(idx, 1)
-}
-
-const addBlacklist = () => {
-  if (newBlacklistIp.value) {
-    firewallForm.blacklist.push(newBlacklistIp.value)
-    newBlacklistIp.value = ''
+async function loadAll() {
+  loading.value = true
+  error.value = ''
+  try {
+    const [overviewRes, auditRes] = await Promise.all([securityApi.overview(), securityApi.audit(100)])
+    overview.value = overviewRes.data || null
+    audit.value = auditRes.data || []
+    stats.value = auditRes.stats || {}
+  } catch (e) {
+    error.value = errText(e, '读取安全信息失败')
+  } finally {
+    loading.value = false
   }
 }
 
-const removeBlacklist = (idx) => {
-  firewallForm.blacklist.splice(idx, 1)
+function go(path) {
+  router.push(path)
 }
 
-const addWhitelist = () => {
-  if (newWhitelistIp.value) {
-    firewallForm.whitelist.push(newWhitelistIp.value)
-    newWhitelistIp.value = ''
+// password
+const passwordOpen = ref(false)
+const passwordSubmitting = ref(false)
+const passwordError = ref('')
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+
+function openPassword() {
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  passwordError.value = ''
+  passwordOpen.value = true
+}
+
+async function submitPassword() {
+  if (passwordSubmitting.value) return
+  passwordError.value = ''
+  if (!passwordForm.oldPassword) {
+    passwordError.value = '请输入当前密码'
+    return
+  }
+  if (passwordForm.newPassword.length < 8) {
+    passwordError.value = '新密码至少 8 位'
+    return
+  }
+  if (!/[A-Za-z]/.test(passwordForm.newPassword) || !/[0-9]/.test(passwordForm.newPassword)) {
+    passwordError.value = '新密码必须同时包含字母和数字'
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    passwordError.value = '两次输入的新密码不一致'
+    return
+  }
+  passwordSubmitting.value = true
+  try {
+    await authApi.changePassword(passwordForm.oldPassword, passwordForm.newPassword)
+    toastSuccess('密码已修改', '请使用新密码重新登录')
+    passwordOpen.value = false
+    clear()
+    router.replace('/login')
+  } catch (e) {
+    passwordError.value = errText(e, '修改密码失败')
+  } finally {
+    passwordSubmitting.value = false
   }
 }
 
-const removeWhitelist = (idx) => {
-  firewallForm.whitelist.splice(idx, 1)
-}
-
-// 其他操作
-const renewCert = (cert) => {
-  ElMessage.info(`续期 ${cert.domain}`)
-}
-
-const backupNow = async () => {
-  backingUp.value = true
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  ElMessage.success('备份创建成功')
-  backingUp.value = false
-}
-
-const clearEvents = () => {
-  recentEvents.value = []
-  ElMessage.success('事件列表已清空')
-}
-
-// 窗口大小变化时重新调整图表
-const handleResize = () => {
-  if (mapChart) mapChart.resize()
-  if (trendChart) trendChart.resize()
-  if (typeChart) typeChart.resize()
-  if (trafficChart) trafficChart.resize()
-}
-
-onMounted(() => {
-  setTimeout(() => {
-    // initMapChart()
-    initTrendChart()
-    initTypeChart()
-    initTrafficChart()
-  }, 500)
-  window.addEventListener('resize', handleResize)
+watch(activeTab, (tab) => {
+  if (route.query.tab !== tab) router.replace({ path: route.path, query: { ...route.query, tab } })
 })
 
-onUnmounted(() => {
-  if (realtimeInterval) clearInterval(realtimeInterval)
-  window.removeEventListener('resize', handleResize)
-})
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (!tab) {
+      activeTab.value = 'overview'
+      return
+    }
+    if (['overview', 'audit', 'firewall'].includes(tab) && tab !== activeTab.value) activeTab.value = tab
+  }
+)
+
+onMounted(loadAll)
 </script>
-
-<style scoped>
-.security-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.top-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.top-left {
-  display: flex;
-  gap: 8px;
-}
-
-.top-right {
-  flex-shrink: 0;
-}
-
-.security-tabs {
-  margin-right: 16px;
-}
-
-.content-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 20px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-/* 统计卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-}
-
-.stat-number {
-  font-size: 28px;
-  font-weight: bold;
-  color: #1f2937;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 4px;
-}
-
-/* 图表区域 */
-.map-section, .chart-section, .two-columns {
-  margin-bottom: 24px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0;
-  padding-left: 8px;
-  border-left: 3px solid #477779;
-}
-
-.map-container {
-  width: 100%;
-  height: 400px;
-  background: #f5f5f5;
-  border-radius: 8px;
-}
-
-.trend-container {
-  width: 100%;
-  height: 300px;
-}
-
-.type-container {
-  width: 100%;
-  height: 280px;
-}
-
-.traffic-container {
-  width: 100%;
-  height: 300px;
-}
-
-.two-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.column {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.events-list {
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.event-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 13px;
-}
-
-.event-item.high {
-  border-left: 3px solid #c62828;
-  background: #fef3f3;
-}
-
-.event-item.medium {
-  border-left: 3px solid #ed6c02;
-}
-
-.event-item.low {
-  border-left: 3px solid #477779;
-}
-
-.event-time {
-  width: 70px;
-  color: #9ca3af;
-  font-size: 11px;
-}
-
-.event-content {
-  flex: 1;
-}
-
-.event-type {
-  font-weight: 500;
-  color: #1f2937;
-  margin-right: 8px;
-}
-
-.event-desc {
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.event-ip {
-  font-family: monospace;
-  color: #477779;
-  font-size: 11px;
-}
-
-.empty {
-  text-align: center;
-  color: #9ca3af;
-  padding: 40px;
-}
-
-/* 防火墙设置样式 */
-.settings-section {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.section-desc {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 8px;
-}
-
-.port-rules {
-  margin-bottom: 16px;
-}
-
-.rule-header {
-  display: grid;
-  grid-template-columns: 120px 100px 150px 80px;
-  gap: 12px;
-  padding: 8px 0;
-  font-size: 13px;
-  color: #9ca3af;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.rule-row {
-  display: grid;
-  grid-template-columns: 120px 100px 150px 80px;
-  gap: 12px;
-  align-items: center;
-  padding: 8px 0;
-}
-
-.rule-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.ip-list {
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 12px;
-}
-
-.ip-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.ip-item:last-child {
-  border-bottom: none;
-}
-
-.add-ip {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-</style>
-<style>
-.top-panel .el-button {
-  height: 28px !important;
-  line-height: 28px !important;
-  padding: 0 12px !important;
-  font-size: 12px !important;
-}
-.top-panel .el-tabs__item {
-  height: 32px !important;
-  line-height: 32px !important;
-  font-size: 13px !important;
-}
-</style>

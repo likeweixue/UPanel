@@ -2,8 +2,12 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"upanel/internal/config"
@@ -11,6 +15,12 @@ import (
 
 // Settings 面板偏好设置（持久化在 data/settings.json）
 type Settings struct {
+	// 面板
+	PanelName     string `json:"panelName"`
+	PanelPort     string `json:"panelPort"`
+	BindIP        string `json:"bindIP"`
+	SecurityEntry string `json:"securityEntry"`
+
 	// 路径设置
 	WebsitePath  string `json:"websitePath"`
 	DatabasePath string `json:"databasePath"`
@@ -27,14 +37,16 @@ type Settings struct {
 	// 界面
 	Theme    string `json:"theme"`
 	Language string `json:"language"`
+	Density  string `json:"density"`
 }
 
 // SettingsService 设置服务
 type SettingsService struct {
-	mu       sync.Mutex
 	path     string
 	settings *Settings
 }
+
+var settingsMu sync.Mutex
 
 // NewSettingsService 创建设置服务
 func NewSettingsService() *SettingsService {
@@ -43,20 +55,36 @@ func NewSettingsService() *SettingsService {
 
 	s := &SettingsService{path: p, settings: defaultSettings(cfg)}
 	s.load()
+	// 服务器相关配置以 config.json 为唯一权威来源，避免 CLI 修改后与 settings.json 不一致。
+	s.settings.PanelPort = cfg.Port
+	s.settings.BindIP = cfg.BindIP
+	s.settings.SecurityEntry = cfg.GetSecurityEntry()
+	s.settings.WebsitePath = cfg.WebsitePath
+	s.settings.DatabasePath = cfg.DatabasePath
+	s.settings.AppPath = cfg.AppPath
+	s.settings.GatewayImage = cfg.GatewayImage
+	s.settings.GatewayHTTPPort = cfg.GatewayHTTPPort
+	s.settings.GatewayHTTPSPort = cfg.GatewayHTTPSPort
+	s.settings.RegistryMirrors = append([]string{}, cfg.RegistryMirrors...)
 	return s
 }
 
 func defaultSettings(cfg *config.Config) *Settings {
 	return &Settings{
+		PanelName:        "UPanel",
+		PanelPort:        cfg.Port,
+		BindIP:           cfg.BindIP,
+		SecurityEntry:    cfg.GetSecurityEntry(),
 		WebsitePath:      cfg.WebsitePath,
 		DatabasePath:     cfg.DatabasePath,
 		AppPath:          cfg.AppPath,
 		GatewayImage:     cfg.GatewayImage,
 		GatewayHTTPPort:  cfg.GatewayHTTPPort,
 		GatewayHTTPSPort: cfg.GatewayHTTPSPort,
-		RegistryMirrors:  cfg.RegistryMirrors,
+		RegistryMirrors:  append([]string{}, cfg.RegistryMirrors...),
 		Theme:            "light",
 		Language:         "zh-CN",
+		Density:          "comfortable",
 	}
 }
 
@@ -68,6 +96,18 @@ func (s *SettingsService) load() {
 	var disk Settings
 	if err := json.Unmarshal(data, &disk); err != nil {
 		return
+	}
+	if disk.PanelName != "" {
+		s.settings.PanelName = disk.PanelName
+	}
+	if disk.PanelPort != "" {
+		s.settings.PanelPort = disk.PanelPort
+	}
+	if disk.BindIP != "" {
+		s.settings.BindIP = disk.BindIP
+	}
+	if disk.SecurityEntry != "" {
+		s.settings.SecurityEntry = disk.SecurityEntry
 	}
 	if disk.WebsitePath != "" {
 		s.settings.WebsitePath = disk.WebsitePath
@@ -96,6 +136,9 @@ func (s *SettingsService) load() {
 	if disk.Language != "" {
 		s.settings.Language = disk.Language
 	}
+	if disk.Density != "" {
+		s.settings.Density = disk.Density
+	}
 }
 
 func (s *SettingsService) save() error {
@@ -106,52 +149,229 @@ func (s *SettingsService) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, data, 0644)
+	return writeFileAtomic(s.path, data, 0600)
 }
 
-// GetAll 获取全部设置
+// GetAll 获取全部设置（返回副本，避免调用方修改内部状态）
 func (s *SettingsService) GetAll() *Settings {
-	return s.settings
+	cp := *s.settings
+	cp.RegistryMirrors = append([]string{}, s.settings.RegistryMirrors...)
+	return &cp
 }
 
-// Update 更新设置；网关与路径类改动同步写回主配置并生效
-func (s *SettingsService) Update(patch *Settings) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func validateBindIP(ip string) error {
+	if ip == "" {
+		return nil
+	}
+	if ip == "localhost" {
+		return nil
+	}
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return fmt.Errorf("监听地址必须是合法的 IPv4/IPv6 地址")
+	}
+	return nil
+}
+
+// validateManagedPath 限制面板数据目录必须位于安装目录之内，
+// 防止把 / 或 /etc 之类的宿主机路径挂载进网关容器。
+func validateManagedPath(base, label, p string) (string, error) {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "", nil
+	}
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(base, p)
+	}
+	p = filepath.Clean(p)
+	rel, err := filepath.Rel(base, p)
+	if err != nil {
+		return "", fmt.Errorf("%s 路径无效: %w", label, err)
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("%s 必须位于安装目录 %s 的子目录中", label, base)
+	}
+	return p, nil
+}
+
+func validateMirrors(mirrors []string) ([]string, error) {
+	if len(mirrors) > 10 {
+		return nil, fmt.Errorf("镜像加速地址最多 10 个")
+	}
+	out := make([]string, 0, len(mirrors))
+	for _, m := range mirrors {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		u, err := url.Parse(m)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("镜像加速地址格式不合法: %s", m)
+		}
+		out = append(out, strings.TrimRight(m, "/"))
+	}
+	return out, nil
+}
+
+// Update 更新设置。
+// 返回 restartRequired 表示面板端口/监听地址/安全入口发生变化，需要重启服务。
+func (s *SettingsService) Update(patch *Settings) (bool, error) {
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
 
 	cfg := config.Current()
-	needGatewayRestart := false
+	restartRequired := false
+	gatewayChanged := false
 
-	if patch.WebsitePath != "" {
-		s.settings.WebsitePath = patch.WebsitePath
-		cfg.WebsitePath = patch.WebsitePath
+	// ---- 先完整校验，全部通过后才落盘 ----
+	panelPort := cfg.Port
+	if patch.PanelPort != "" && patch.PanelPort != s.settings.PanelPort {
+		if err := config.ValidatePort(patch.PanelPort); err != nil {
+			return false, fmt.Errorf("面板端口无效: %w", err)
+		}
+		panelPort = strings.TrimSpace(patch.PanelPort)
+		restartRequired = true
 	}
-	if patch.DatabasePath != "" {
-		s.settings.DatabasePath = patch.DatabasePath
-		cfg.DatabasePath = patch.DatabasePath
+	bindIP := cfg.BindIP
+	if patch.BindIP != "" && patch.BindIP != s.settings.BindIP {
+		if err := validateBindIP(patch.BindIP); err != nil {
+			return false, err
+		}
+		bindIP = strings.TrimSpace(patch.BindIP)
+		restartRequired = true
 	}
-	if patch.AppPath != "" {
-		s.settings.AppPath = patch.AppPath
-		cfg.AppPath = patch.AppPath
+	entry := cfg.GetSecurityEntry()
+	if patch.SecurityEntry != s.settings.SecurityEntry {
+		normalized, err := config.NormalizeSecurityEntry(patch.SecurityEntry)
+		if err != nil {
+			return false, err
+		}
+		if normalized != entry {
+			entry = normalized
+			restartRequired = true
+		}
 	}
+
+	websitePath, err := validateManagedPath(cfg.BaseDir, "网站目录", patch.WebsitePath)
+	if err != nil {
+		return false, err
+	}
+	databasePath, err := validateManagedPath(cfg.BaseDir, "数据库目录", patch.DatabasePath)
+	if err != nil {
+		return false, err
+	}
+	appPath, err := validateManagedPath(cfg.BaseDir, "应用目录", patch.AppPath)
+	if err != nil {
+		return false, err
+	}
+
+	gatewayImage := cfg.GatewayImage
 	if patch.GatewayImage != "" && patch.GatewayImage != s.settings.GatewayImage {
-		s.settings.GatewayImage = patch.GatewayImage
-		cfg.GatewayImage = patch.GatewayImage
-		needGatewayRestart = true
+		if err := validateImageRef(patch.GatewayImage); err != nil {
+			return false, err
+		}
+		gatewayImage = patch.GatewayImage
+		gatewayChanged = true
 	}
+	gatewayHTTP := cfg.GatewayHTTPPort
 	if patch.GatewayHTTPPort != "" && patch.GatewayHTTPPort != s.settings.GatewayHTTPPort {
-		s.settings.GatewayHTTPPort = patch.GatewayHTTPPort
-		cfg.GatewayHTTPPort = patch.GatewayHTTPPort
-		needGatewayRestart = true
+		if err := config.ValidatePort(patch.GatewayHTTPPort); err != nil {
+			return false, fmt.Errorf("网关 HTTP 端口无效: %w", err)
+		}
+		gatewayHTTP = strings.TrimSpace(patch.GatewayHTTPPort)
+		gatewayChanged = true
 	}
+	gatewayHTTPS := cfg.GatewayHTTPSPort
 	if patch.GatewayHTTPSPort != "" && patch.GatewayHTTPSPort != s.settings.GatewayHTTPSPort {
-		s.settings.GatewayHTTPSPort = patch.GatewayHTTPSPort
-		cfg.GatewayHTTPSPort = patch.GatewayHTTPSPort
-		needGatewayRestart = true
+		if err := config.ValidatePort(patch.GatewayHTTPSPort); err != nil {
+			return false, fmt.Errorf("网关 HTTPS 端口无效: %w", err)
+		}
+		gatewayHTTPS = strings.TrimSpace(patch.GatewayHTTPSPort)
+		gatewayChanged = true
 	}
-	if len(patch.RegistryMirrors) > 0 {
-		s.settings.RegistryMirrors = patch.RegistryMirrors
-		cfg.RegistryMirrors = patch.RegistryMirrors
+	if gatewayHTTP != "" && gatewayHTTP == gatewayHTTPS {
+		return false, fmt.Errorf("网关 HTTP 与 HTTPS 端口不能相同")
+	}
+	if panelPort != cfg.Port {
+		addr := net.JoinHostPort(bindIP, panelPort)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			return false, fmt.Errorf("面板监听地址 %s 不可用: %w", addr, err)
+		}
+		_ = ln.Close()
+	}
+	if gatewayChanged {
+		for _, port := range []string{gatewayHTTP, gatewayHTTPS} {
+			if port == "" || port == cfg.GatewayHTTPPort || port == cfg.GatewayHTTPSPort {
+				continue
+			}
+			ln, err := net.Listen("tcp", "0.0.0.0:"+port)
+			if err != nil {
+				return false, fmt.Errorf("网关端口 %s 已被占用，请先停止占用该端口的服务", port)
+			}
+			_ = ln.Close()
+		}
+	}
+	mirrors, err := validateMirrors(patch.RegistryMirrors)
+	if err != nil {
+		return false, err
+	}
+	if patch.PanelName != "" {
+		name := strings.TrimSpace(patch.PanelName)
+		if name == "" || len(name) > 64 || strings.ContainsAny(name, "\r\n\x00") {
+			return false, fmt.Errorf("面板名称不能为空且最多 64 个字符")
+		}
+	}
+	if patch.Language != "" && patch.Language != "zh-CN" && patch.Language != "en-US" {
+		return false, fmt.Errorf("不支持的语言: %s", patch.Language)
+	}
+	if patch.Theme != "" && patch.Theme != "light" && patch.Theme != "dark" && patch.Theme != "system" {
+		return false, fmt.Errorf("不支持的主题: %s", patch.Theme)
+	}
+	if patch.Density != "" && patch.Density != "comfortable" && patch.Density != "compact" {
+		return false, fmt.Errorf("不支持的密度: %s", patch.Density)
+	}
+
+	// ---- 应用 ----
+	old := *cfg
+	old.RegistryMirrors = append([]string{}, cfg.RegistryMirrors...)
+
+	if websitePath != "" {
+		cfg.WebsitePath = websitePath
+		s.settings.WebsitePath = websitePath
+	}
+	if databasePath != "" {
+		cfg.DatabasePath = databasePath
+		s.settings.DatabasePath = databasePath
+	}
+	if appPath != "" {
+		cfg.AppPath = appPath
+		s.settings.AppPath = appPath
+	}
+	if gatewayImage != cfg.GatewayImage {
+		cfg.GatewayImage = gatewayImage
+		s.settings.GatewayImage = gatewayImage
+	}
+	if gatewayHTTP != cfg.GatewayHTTPPort {
+		cfg.GatewayHTTPPort = gatewayHTTP
+		s.settings.GatewayHTTPPort = gatewayHTTP
+	}
+	if gatewayHTTPS != cfg.GatewayHTTPSPort {
+		cfg.GatewayHTTPSPort = gatewayHTTPS
+		s.settings.GatewayHTTPSPort = gatewayHTTPS
+	}
+	if len(mirrors) > 0 || patch.RegistryMirrors != nil {
+		cfg.RegistryMirrors = mirrors
+		s.settings.RegistryMirrors = mirrors
+	}
+	cfg.Port = panelPort
+	cfg.BindIP = bindIP
+	cfg.SecurityEntry = strings.TrimPrefix(entry, "/")
+	s.settings.PanelPort = panelPort
+	s.settings.BindIP = bindIP
+	s.settings.SecurityEntry = entry
+	if patch.PanelName != "" {
+		s.settings.PanelName = strings.TrimSpace(patch.PanelName)
 	}
 	if patch.Theme != "" {
 		s.settings.Theme = patch.Theme
@@ -159,47 +379,73 @@ func (s *SettingsService) Update(patch *Settings) error {
 	if patch.Language != "" {
 		s.settings.Language = patch.Language
 	}
+	if patch.Density != "" {
+		s.settings.Density = patch.Density
+	}
 
 	if err := cfg.Save(); err != nil {
-		return err
-	}
-	if err := s.save(); err != nil {
-		return err
+		*cfg = old
+		return false, err
 	}
 	if err := cfg.EnsureDirs(); err != nil {
-		return err
+		*cfg = old
+		_ = cfg.Save()
+		return false, err
+	}
+	if err := s.save(); err != nil {
+		*cfg = old
+		_ = cfg.Save()
+		return false, err
 	}
 
-	if needGatewayRestart {
-		gw, err := NewGatewayService()
-		if err != nil {
-			return err
+	pathsChanged := (websitePath != "" && websitePath != old.WebsitePath) ||
+		(databasePath != "" && databasePath != old.DatabasePath) ||
+		(appPath != "" && appPath != old.AppPath)
+	if gatewayChanged || pathsChanged {
+		if err := restartGateway(cfg); err != nil {
+			*cfg = old
+			_ = cfg.Save()
+			_ = restartGateway(cfg)
+			return false, fmt.Errorf("网关重启失败，已恢复原配置: %w", err)
 		}
-		defer gw.Close()
-		// 重建网关容器以应用新镜像 / 新端口
-		if err := gw.rt.Remove(GatewayName); err != nil {
-			return err
-		}
-		return gw.Ensure(nil)
 	}
-	return nil
+
+	return restartRequired, nil
+}
+
+// restartGateway 重建网关容器以应用新镜像/端口/挂载路径
+func restartGateway(cfg *config.Config) error {
+	rt, err := NewRuntime()
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	g := NewGatewayServiceWith(rt)
+	if err := rt.Remove(GatewayName); err != nil {
+		return err
+	}
+	return g.Ensure(nil)
 }
 
 // SetTheme 更新主题
 func (s *SettingsService) SetTheme(theme string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
 	s.settings.Theme = theme
 	return s.save()
 }
 
 // SetRegistryMirrors 更新镜像加速
 func (s *SettingsService) SetRegistryMirrors(mirrors []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.settings.RegistryMirrors = mirrors
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
+	out, err := validateMirrors(mirrors)
+	if err != nil {
+		return err
+	}
+	s.settings.RegistryMirrors = out
 	cfg := config.Current()
-	cfg.RegistryMirrors = mirrors
+	cfg.RegistryMirrors = out
 	_ = cfg.Save()
 	return s.save()
 }

@@ -1,199 +1,172 @@
 <template>
-  <div class="ssh-container">
-    <div class="top-panel">
-      <div class="top-left">
-        <el-button type="primary" @click="connectDialogVisible = true">
-          <el-icon><Link /></el-icon> 新建连接
-        </el-button>
-        <el-button @click="clearTerminal">
-          <el-icon><Delete /></el-icon> 清屏
-        </el-button>
-      </div>
-      <div class="top-right">
-        <div class="connection-status">
-          <span class="status-dot" :class="{ connected: connected }"></span>
-          <span>{{ connected ? '已连接' : '未连接' }}</span>
+  <div class="page">
+    <header class="page__header">
+      <div>
+        <div class="page__title-row">
+          <h1 class="page__title">SSH 服务</h1>
+          <UStatusDot
+            :status="ssh?.serviceActive ? 'running' : ssh?.installed ? 'warning' : 'error'"
+            :text="ssh?.serviceActive ? 'sshd 运行中' : ssh?.installed ? 'sshd 未运行' : '未检测到'"
+          />
         </div>
+        <p class="page__subtitle">只读查看 sshd 配置与安全建议，不在此处修改系统配置</p>
       </div>
+      <div class="page__actions">
+        <UButton icon="refresh" label="刷新" :loading="loading" @click="load" />
+      </div>
+    </header>
+
+    <div v-if="error" class="alert alert--danger" role="alert">
+      <UIcon name="alert" :size="16" class="alert__icon" />
+      <div class="alert__body">{{ error }}</div>
     </div>
 
-    <div class="terminal-panel">
-      <div ref="terminalRef" class="terminal-container"></div>
+    <div v-if="loading && !ssh" class="loading-block"><span class="spinner" /> 正在读取 sshd 配置…</div>
+
+    <div v-else-if="ssh && ssh.supported === false" class="table-wrap">
+      <UEmpty
+        icon="terminal"
+        title="当前系统不支持该功能"
+        :description="ssh.error || 'SSH 状态仅在 Linux 服务器上可用。'"
+      />
     </div>
 
-    <el-dialog v-model="connectDialogVisible" title="SSH 连接" width="400px">
-      <el-form :model="connectForm" label-width="80px">
-        <el-form-item label="主机">
-          <el-input v-model="connectForm.host" placeholder="localhost" />
-        </el-form-item>
-        <el-form-item label="端口">
-          <el-input-number v-model="connectForm.port" :min="1" :max="65535" />
-        </el-form-item>
-        <el-form-item label="用户名">
-          <el-input v-model="connectForm.username" placeholder="root" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="connectForm.password" type="password" placeholder="密码" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="connectDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="connectSSH">连接</el-button>
-      </template>
-    </el-dialog>
+    <div v-else-if="ssh" class="widget-grid">
+      <UWidget title="服务状态" subtitle="systemctl 检测结果" icon="terminal" :span="7">
+        <div class="stack">
+          <div class="row">
+            <UStatusDot
+              :status="ssh.serviceActive ? 'running' : ssh.installed ? 'warning' : 'error'"
+              :text="ssh.serviceActive ? 'SSH 服务运行中' : ssh.installed ? 'SSH 服务未运行' : '未安装 / 无法检测'"
+            />
+            <span class="badge">端口 {{ ssh.port || '22' }}</span>
+            <span v-if="ssh.serviceName" class="badge badge--primary">{{ ssh.serviceName }}</span>
+          </div>
+          <dl class="info-list">
+            <div class="info-list__row">
+              <dt class="info-list__label">配置文件</dt>
+              <dd class="info-list__value mono">{{ ssh.configPath || '/etc/ssh/sshd_config' }}</dd>
+            </div>
+            <div class="info-list__row">
+              <dt class="info-list__label">密码登录</dt>
+              <dd class="info-list__value">
+                <span :class="['badge', ssh.passwordAuthentication === 'yes' ? 'badge--warning' : 'badge--success']">
+                  {{ ssh.passwordAuthentication || '未设置' }}
+                </span>
+              </dd>
+            </div>
+            <div class="info-list__row">
+              <dt class="info-list__label">root 登录</dt>
+              <dd class="info-list__value">
+                <span :class="['badge', ssh.permitRootLogin === 'yes' ? 'badge--danger' : 'badge--success']">
+                  {{ ssh.permitRootLogin || '未设置' }}
+                </span>
+              </dd>
+            </div>
+            <div class="info-list__row">
+              <dt class="info-list__label">公钥登录</dt>
+              <dd class="info-list__value">{{ ssh.pubkeyAuthentication || '未设置' }}</dd>
+            </div>
+          </dl>
+          <div v-if="ssh.error" class="alert alert--warning">
+            <UIcon name="alert" :size="16" class="alert__icon" />
+            <div class="alert__body">{{ ssh.error }}</div>
+          </div>
+          <div class="field">
+            <span class="field__label">连接命令</span>
+            <div class="row" style="align-items: flex-start">
+              <code class="code--inline grow" style="white-space: normal">{{ sshCommand }}</code>
+              <UButton variant="secondary" size="sm" icon="copy" label="复制" @click="copy(sshCommand)" />
+            </div>
+            <p class="field__hint">请在本地终端执行，面板不会保存你的 SSH 密钥。</p>
+          </div>
+        </div>
+      </UWidget>
+
+      <UWidget title="安全建议" subtitle="来自当前 sshd 配置" icon="shield" :span="5">
+        <div v-if="!ssh.warnings || ssh.warnings.length === 0" class="alert alert--success">
+          <UIcon name="check-circle" :size="16" class="alert__icon" />
+          <div class="alert__body">当前 SSH 配置未发现明显风险</div>
+        </div>
+        <div v-else class="warning-list">
+          <div v-for="(warning, index) in ssh.warnings" :key="index" class="warning-item">
+            <UIcon name="alert" :size="15" />
+            <span>{{ warning }}</span>
+          </div>
+        </div>
+        <div class="alert alert--info" style="margin-top: 12px">
+          <UIcon name="info" :size="16" class="alert__icon" />
+          <div class="alert__body">
+            修改 <code class="code--inline">/etc/ssh/sshd_config</code> 后执行
+            <code class="code--inline">sshd -t</code> 校验，再 <code class="code--inline">systemctl reload sshd</code>。
+          </div>
+        </div>
+      </UWidget>
+
+      <UWidget title="加固清单" subtitle="适合生产服务器的通用建议" icon="check-circle" :span="12">
+        <div class="checklist">
+          <div v-for="tip in tips" :key="tip.title" class="checklist__item">
+            <span class="checklist__icon checklist__icon--ok"><UIcon name="check" :size="13" /></span>
+            <div class="checklist__body">
+              <p class="checklist__title">{{ tip.title }}</p>
+              <p class="checklist__desc">{{ tip.desc }}</p>
+            </div>
+          </div>
+        </div>
+      </UWidget>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Link, Delete } from '@element-plus/icons-vue'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import 'xterm/css/xterm.css'
+import { computed, onMounted, ref } from 'vue'
+import UButton from '@/components/ui/UButton.vue'
+import UEmpty from '@/components/ui/UEmpty.vue'
+import UIcon from '@/components/ui/UIcon.vue'
+import UStatusDot from '@/components/ui/UStatusDot.vue'
+import UWidget from '@/components/ui/UWidget.vue'
+import { errText, systemApi } from '@/api'
+import { copyText } from '@/composables/useFormat'
+import { toastError, toastSuccess } from '@/composables/useToast'
 
-const terminalRef = ref(null)
-const connected = ref(false)
-const connectDialogVisible = ref(false)
-let terminal = null
-let fitAddon = null
+const ssh = ref(null)
+const loading = ref(false)
+const error = ref('')
 
-const connectForm = ref({
-  host: 'localhost',
-  port: 22,
-  username: 'root',
-  password: ''
+const sshCommand = computed(() => {
+  const host = window.location.hostname || '服务器IP'
+  return `ssh root@${host} -p ${ssh.value?.port || 22}`
 })
 
-const initTerminal = () => {
-  if (terminal) {
-    terminal.dispose()
-  }
-  
-  terminal = new Terminal({
-    cursorBlink: true,
-    fontSize: 14,
-    theme: {
-      background: '#1e1e1e',
-      foreground: '#ffffff'
-    }
-  })
-  
-  fitAddon = new FitAddon()
-  terminal.loadAddon(fitAddon)
-  terminal.open(terminalRef.value)
-  fitAddon.fit()
-  
-  terminal.writeln('Welcome to UPanel SSH Terminal')
-  terminal.writeln('请输入连接信息后点击连接')
-  terminal.write('$ ')
-}
+const tips = [
+  { title: '使用密钥登录', desc: '禁用密码登录（PasswordAuthentication no），只保留公钥认证。' },
+  { title: '限制 root 登录', desc: '设置 PermitRootLogin prohibit-password，日常使用普通用户 + sudo。' },
+  { title: '修改默认端口', desc: '把 22 端口改为高位端口，并同步更新防火墙与云安全组规则。' },
+  { title: '限制来源 IP', desc: '如果固定办公网络，可在安全组中只允许指定 IP 访问 SSH。' },
+  { title: '安装 fail2ban', desc: '自动封禁暴力破解来源 IP，降低公网暴露风险。' },
+]
 
-const connectSSH = async () => {
-  if (!connectForm.value.host || !connectForm.value.username) {
-    ElMessage.warning('请填写主机和用户名')
-    return
-  }
-  
-  connected.value = true
-  connectDialogVisible.value = false
-  
-  terminal.clear()
-  terminal.writeln(`Connecting to ${connectForm.value.username}@${connectForm.value.host}:${connectForm.value.port}...`)
-  terminal.writeln('')
-  terminal.writeln('\x1b[32mConnected successfully!\x1b[0m')
-  terminal.writeln('')
-  terminal.write(`${connectForm.value.username}@${connectForm.value.host}:~$ `)
-}
-
-const clearTerminal = () => {
-  if (terminal) {
-    terminal.clear()
-    terminal.write(`${connectForm.value.username}@${connectForm.value.host}:~$ `)
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await systemApi.ssh()
+    ssh.value = res.data || null
+  } catch (e) {
+    error.value = errText(e, '读取 SSH 状态失败')
+  } finally {
+    loading.value = false
   }
 }
 
-const handleResize = () => {
-  if (fitAddon) {
-    fitAddon.fit()
+async function copy(text) {
+  try {
+    await copyText(text)
+    toastSuccess('已复制')
+  } catch (e) {
+    toastError('复制失败', '请手动选择文本复制')
   }
 }
 
-onMounted(() => {
-  setTimeout(() => {
-    if (terminalRef.value) {
-      initTerminal()
-    }
-  }, 100)
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  if (terminal) {
-    terminal.dispose()
-  }
-  window.removeEventListener('resize', handleResize)
-})
+onMounted(load)
 </script>
-
-<style scoped>
-.ssh-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.top-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.top-left {
-  display: flex;
-  gap: 8px;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #9ca3af;
-}
-
-.status-dot.connected {
-  background-color: #2e7d32;
-}
-
-.terminal-panel {
-  background: #1e1e1e;
-  border-radius: 4px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.terminal-container {
-  width: 100%;
-  height: 100%;
-  padding: 8px;
-}
-</style>
-<style>
-.top-panel .el-button {
-  height: 28px !important;
-  line-height: 28px !important;
-  padding: 0 12px !important;
-  font-size: 12px !important;
-}
-</style>

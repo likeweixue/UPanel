@@ -4,6 +4,63 @@
 
 ---
 
+## v0.1.7 (2026-10-24)
+
+本版本集中在「网站真正能跑通」、安全加固与后台 UI 重构。
+
+### 🚀 网站部署修复（关键）
+- 修复 **Docker bind mount 文件被无条件 `MkdirAll` 导致网关创建失败**：`nginx.conf` / `docker.sock` 等文件挂载不再被当成目录创建。
+- 修复 **PHP `SCRIPT_FILENAME` 指向网关路径**：php-fpm 在独立容器中，现固定为 `/var/www/html$fastcgi_script_name`，并设置 `DOCUMENT_ROOT`。
+- 修复 Docker 网络 `EndpointSettings.NetworkID` 使用网络名的问题，改为真实网络 ID。
+- 网关容器站点目录 / 证书 / 配置改为只读挂载，日志目录单独可写；主配置原地写入以保留 single-file bind mount 的 inode。
+- 网关写入配置前备份、`nginx -t` 失败自动回滚；重载失败不再用「重启容器」兜底，避免坏配置导致全部站点宕机。
+- 修复强制 HTTPS 时 80 端口出现重复 server 块、HTTPS 丢失安全响应头、静态站点把 `index.php` 当默认索引导致源码泄露等问题。
+- 删除站点但保留文件后，可以用同域名重建，且不会覆盖已有首页。
+- 修复 PHP 版本切换时同名容器直接复用、版本不生效的问题，并支持失败回滚。
+- 站点、数据库、应用创建失败时不再删除已存在的数据目录（保留数据重建场景）。
+- 处理 PHP / Redis / MySQL / PostgreSQL / MinIO / WordPress 等容器用户对宿主机数据目录的写权限。
+- 支持 SELinux 主机（bind mount `:z`）。
+
+### 🔐 安全加固
+- 移除固定默认密码 `upanel123`：首次裸启动生成 16 位随机密码到 `data/initial-password.txt`（0600），安装脚本也不允许弱密码；升级时检测到旧版默认密码会强制重置。
+- 移除固定 JWT 兜底密钥；JWT 密钥自动生成并持久化，长度不足 32 时重新生成。
+- JWT 绑定密码哈希指纹与会话版本：修改密码 / 登出立即使旧令牌失效，且登出状态在重启后仍然有效。
+- 登录失败限流（同 IP 8 次 / 10 分钟，锁定 15 分钟）+ 登录审计。
+- 安全响应头（CSP、XFO、nosniff、Referrer-Policy、Permissions-Policy），移除通配 CORS。
+- 安全入口完整生效：API 也挂到入口下，未带入口的路径 404，前端资源通过注入 `<base>` 正常加载；保留路径（api/assets）被拒绝。
+- 网站域名、别名、PHP 版本、镜像、端口、站点类型、数据库名/版本、应用名/版本、数据目录、面板端口/监听地址全部校验。
+- 数据库与应用端口默认只绑定 `127.0.0.1`；Redis 通过 `--requirepass` 启用认证；随机凭据。
+- 文件上传大小限制、文件名清洗、下载需要 Bearer Token；阻止路径穿越与隐藏文件 / 备份文件暴露。
+- 请求体大小限制、HTTP server 超时、`SetTrustedProxies(nil)`、优雅退出。
+
+### 🎨 UI 重构：Flarum 2.0 admin SPA 风格
+- 全新 flat / minimalist 视觉：固定 header + drawer + Widget 卡片流；
+- 渐进披露导航：抽屉 8 个一级入口，全部 **36 个入口**收进一个可搜索下拉（`/` 或 `Ctrl/Cmd+K`）；
+- 自研 BEM-ish 组件库：`Button--icon`、`Dropdown--select`、`DashboardWidget`、`StatusDot`、Modal、Tabs、Toast、Sparkline 等；
+- 浅色 / 深色 / 跟随系统主题，标准 / 紧凑密度；
+- a11y：`sr-only` skip link、`aria-*`、键盘导航、焦点陷阱与焦点恢复、`aria-live`、减少动画偏好；
+- 全部页面重写：总览、网站、数据库、应用商店、容器、文件、监控、安全、计划任务、SSH、邮件、设置、登录；
+- 桌面 / 平板 / 手机适配；Docker 未连接时网站、数据库、应用列表仍可只读查看。
+
+### ✨ 新增功能
+- 计划任务（cron）：创建 / 编辑 / 启用 / 立即执行 / 输出记录（文件 `data/cron.json`，0600）；
+- SMTP 邮件配置与测试发送（`data/email.json`，0600，GET 不返回密码）；
+- 登录审计、安全基线、SSH / 防火墙只读状态；
+- 容器镜像 / 数据卷 / 网络列表、站点日志读取、文件下载、应用凭据查询；
+- Docker daemon.json 合并保存（保留未知字段并备份），日志驱动 / 镜像加速 / 并发下载配置。
+
+### 🧪 测试
+- 新增网站配置、域名 / 别名注入防护、ForceSSL、PHP SCRIPT_FILENAME、静态站点隐藏文件、通配域名 Slug、cron 解析、Redis requirepass、文件 tail、时长格式化、安全入口等单元测试；
+- `go build ./...`、`go vet ./...`、`go test ./...` 全部通过；前端 `vite build` 通过。
+
+### ⚠️ 已知限制
+- 暂未集成 Let's Encrypt 自动签发；
+- SSH / 防火墙为只读检查；
+- 单管理员模式，面板自身 HTTPS 需外部反向代理；
+- 站点日志未自动轮转。
+
+---
+
 ## v0.1.6-lts (2026-10-19)
 
 本次版本是对「网站部署无法正常工作」这一核心问题的彻底重构，同时补齐了离线分发能力。

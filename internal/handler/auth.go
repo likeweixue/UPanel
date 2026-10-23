@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"upanel/internal/service"
@@ -36,21 +37,33 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	token, err := h.service.Login(req.Username, req.Password)
 	if err != nil {
+		service.RecordLoginAttempt(c.ClientIP(), c.GetHeader("User-Agent"), req.Username, false, err.Error())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	
+
+	service.RecordLoginAttempt(c.ClientIP(), c.GetHeader("User-Agent"), req.Username, true, "")
 	c.JSON(http.StatusOK, gin.H{
 		"token":   token,
 		"message": "登录成功",
 	})
 }
 
-// 登出（客户端删除 token 即可，服务端无需操作）
+// 登出：把当前 JWT 加入黑名单，立即失效
 func (h *AuthHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		_ = h.service.RevokeToken(strings.TrimSpace(parts[1]))
+	}
+	// 递增会话版本：当前进程内立即生效，并在重启后依然阻止旧令牌
+	if err := h.service.RevokeAllSessions(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "登出失败，请重试"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "已登出"})
 }
 
@@ -61,9 +74,9 @@ func (h *AuthHandler) GetUserInfo(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"username": username,
+		"data": gin.H{"username": username, "role": "administrator"},
 	})
 }
 
@@ -86,7 +99,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
 		return
 	}
-	
+
 	// 同时兼容 snake_case 与 camelCase 字段命名
 	var raw map[string]interface{}
 	if err := c.ShouldBindJSON(&raw); err != nil {
@@ -107,6 +120,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "密码修改成功"})
 }

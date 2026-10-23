@@ -13,7 +13,7 @@ import (
 )
 
 // Version 与面板主程序保持一致
-var Version = "v0.1.6-lts"
+var Version = "v0.1.7"
 
 const serviceName = "upanel"
 
@@ -271,8 +271,8 @@ func modifySystem(sub, val string) {
 			name = readLine("请输入新用户名: ")
 		}
 		name = strings.TrimSpace(name)
-		if name == "" {
-			fmt.Println("✗ 用户名不能为空")
+		if name == "" || len(name) > 64 || strings.ContainsAny(name, "\r\n\x00") {
+			fmt.Println("✗ 用户名不能为空且最多 64 个字符")
 			return
 		}
 		cfg.Username = name
@@ -293,8 +293,8 @@ func modifySystem(sub, val string) {
 				return
 			}
 		}
-		if len(pwd) < 6 {
-			fmt.Println("✗ 密码长度不能少于 6 位")
+		if len(pwd) < service.MinPasswordLength {
+			fmt.Printf("✗ 密码长度不能少于 %d 位，且需同时包含字母和数字\n", service.MinPasswordLength)
 			return
 		}
 		auth := service.NewAuthService()
@@ -310,8 +310,8 @@ func modifySystem(sub, val string) {
 			port = readLine("请输入新端口号: ")
 		}
 		port = strings.TrimSpace(port)
-		if port == "" {
-			fmt.Println("✗ 端口不能为空")
+		if err := config.ValidatePort(port); err != nil {
+			fmt.Println("✗", err)
 			return
 		}
 		cfg.Port = port
@@ -331,8 +331,13 @@ func modifySystem(sub, val string) {
 		if entry == "-" {
 			entry = ""
 		}
-		entry = strings.Trim(entry, "/")
-		cfg.SecurityEntry = entry
+		normalized, err := config.NormalizeSecurityEntry(entry)
+		if err != nil {
+			fmt.Println("✗", err)
+			return
+		}
+		entry = normalized
+		cfg.SecurityEntry = strings.TrimPrefix(entry, "/")
 		if err := cfg.Save(); err != nil {
 			fmt.Println("✗ 保存失败:", err)
 			return
@@ -340,7 +345,7 @@ func modifySystem(sub, val string) {
 		if entry == "" {
 			fmt.Println("✓ 已取消安全入口")
 		} else {
-			fmt.Printf("✓ 安全入口已设置为 /%s\n", entry)
+			fmt.Printf("✓ 安全入口已设置为 %s\n", entry)
 		}
 		ctl("restart")
 
@@ -351,7 +356,7 @@ func modifySystem(sub, val string) {
 
 func resetSystem() {
 	cfg := loadCfg()
-	fmt.Println("警告: 此操作将把面板端口重置为 8080、用户名重置为 admin，并重置密码为 upanel123")
+	fmt.Println("警告: 此操作将把面板端口重置为 8080、用户名重置为 admin，并生成一个随机密码")
 	if !confirm("确认重置？(y/N): ") {
 		fmt.Println("已取消")
 		return
@@ -363,12 +368,15 @@ func resetSystem() {
 		fmt.Println("✗ 保存失败:", err)
 		return
 	}
+	password := config.RandomPassword(16)
 	auth := service.NewAuthService()
-	if err := auth.SetPassword("upanel123"); err != nil {
+	if err := auth.SetPassword(password); err != nil {
 		fmt.Println("✗ 密码重置失败:", err)
 		return
 	}
-	fmt.Println("✓ 已重置：端口 8080 / 用户名 admin / 密码 upanel123")
+	fmt.Println("✓ 已重置：端口 8080 / 用户名 admin")
+	fmt.Printf("✓ 新的随机密码: %s\n", password)
+	fmt.Println("  请立即登录并修改密码")
 	ctl("restart")
 }
 

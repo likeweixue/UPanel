@@ -1,127 +1,176 @@
 package handler
 
 import (
-    "net/http"
-    "strconv"
+	"net/http"
+	"strconv"
 
-    "github.com/gin-gonic/gin"
-    "upanel/internal/service"
+	"github.com/gin-gonic/gin"
+	"upanel/internal/service"
 )
 
 type ContainerHandler struct {
-    service *service.ContainerService
-    err     error
+	service *service.ContainerService
+	rt      *service.Runtime
+	err     error
 }
 
 // NewContainerHandler 创建容器处理器。
 // Docker 不可用时仍返回处理器，保证路由注册，请求时再给出明确提示。
 func NewContainerHandler() (*ContainerHandler, error) {
-    s, err := service.NewContainerService()
-    return &ContainerHandler{service: s, err: err}, nil
+	s, err := service.NewContainerService()
+	h := &ContainerHandler{service: s, err: err}
+	if err == nil {
+		if rt, rerr := service.NewRuntime(); rerr == nil {
+			h.rt = rt
+		}
+	}
+	return h, nil
 }
 
 func (h *ContainerHandler) Close() {
-    if h.service != nil {
-        h.service.Close()
-    }
+	if h.service != nil {
+		h.service.Close()
+	}
+	if h.rt != nil {
+		h.rt.Close()
+	}
 }
 
 // unavailable 服务不可用时响应明确错误
 func (h *ContainerHandler) unavailable(c *gin.Context) bool {
-    if h.err != nil || h.service == nil {
-        c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Docker 未连接，无法执行该操作: " + h.err.Error()})
-        return true
-    }
-    return false
+	if h.err != nil || h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Docker 未连接，该功能暂不可用",
+			"code":  "docker_unavailable",
+		})
+		return true
+	}
+	return false
 }
 
 // 获取容器列表
 func (h *ContainerHandler) List(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    all := c.Query("all") == "true"
-    containers, err := h.service.ListContainers(all)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"data": containers})
+	if h.unavailable(c) {
+		return
+	}
+	all := c.Query("all") != "false"
+	containers, err := h.service.ListContainers(all)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if containers == nil {
+		containers = []service.ContainerInfo{}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": containers})
 }
 
 // 启动容器
 func (h *ContainerHandler) Start(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    id := c.Param("id")
-    err := h.service.StartContainer(id)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "容器已启动"})
+	if h.unavailable(c) {
+		return
+	}
+	if err := h.service.StartContainer(c.Param("id")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "容器已启动"})
 }
 
 // 停止容器
 func (h *ContainerHandler) Stop(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    id := c.Param("id")
-    err := h.service.StopContainer(id)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "容器已停止"})
+	if h.unavailable(c) {
+		return
+	}
+	if err := h.service.StopContainer(c.Param("id")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "容器已停止"})
 }
 
 // 重启容器
 func (h *ContainerHandler) Restart(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    id := c.Param("id")
-    err := h.service.RestartContainer(id)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "容器已重启"})
+	if h.unavailable(c) {
+		return
+	}
+	if err := h.service.RestartContainer(c.Param("id")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "容器已重启"})
 }
 
 // 删除容器
 func (h *ContainerHandler) Remove(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    id := c.Param("id")
-    force := c.Query("force") == "true"
-    err := h.service.RemoveContainer(id, force)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "容器已删除"})
+	if h.unavailable(c) {
+		return
+	}
+	force := c.Query("force") != "false"
+	if err := h.service.RemoveContainer(c.Param("id"), force); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "容器已删除"})
 }
 
 // 获取容器日志
 func (h *ContainerHandler) Logs(c *gin.Context) {
-    if h.unavailable(c) {
-        return
-    }
-    id := c.Param("id")
-    tail := 100
-    if t := c.Query("tail"); t != "" {
-        if parsed, err := strconv.Atoi(t); err == nil {
-            tail = parsed
-        }
-    }
-    logs, err := h.service.GetContainerLogs(id, tail)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"logs": logs})
+	if h.unavailable(c) {
+		return
+	}
+	tail := 200
+	if t := c.Query("tail"); t != "" {
+		if parsed, err := strconv.Atoi(t); err == nil {
+			tail = parsed
+		}
+	}
+	logs, err := h.service.GetContainerLogs(c.Param("id"), tail)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": logs})
+}
+
+// Images 镜像列表
+func (h *ContainerHandler) Images(c *gin.Context) {
+	if h.rt == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Docker 未连接", "code": "docker_unavailable"})
+		return
+	}
+	images, err := h.rt.ListImages()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": images})
+}
+
+// Volumes 数据卷列表
+func (h *ContainerHandler) Volumes(c *gin.Context) {
+	if h.rt == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Docker 未连接", "code": "docker_unavailable"})
+		return
+	}
+	volumes, err := h.rt.ListVolumes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": volumes})
+}
+
+// Networks 网络列表
+func (h *ContainerHandler) Networks(c *gin.Context) {
+	if h.rt == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Docker 未连接", "code": "docker_unavailable"})
+		return
+	}
+	networks, err := h.rt.ListNetworks()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": networks})
 }

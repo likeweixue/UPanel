@@ -1,53 +1,55 @@
-import { ref, watch } from 'vue'
+import { reactive } from 'vue'
 
-const isDark = ref(localStorage.getItem('theme') === 'dark')
+const THEME_KEY = 'upanel_theme'
+const DENSITY_KEY = 'upanel_density'
 
-// 监听系统主题变化
-const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-mediaQuery.addEventListener('change', (e) => {
-  if (localStorage.getItem('theme') === 'auto') {
-    isDark.value = e.matches
-  }
+const media = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(prefers-color-scheme: dark)')
+  : null
+
+export const themeState = reactive({
+  mode: localStorage.getItem(THEME_KEY) || 'light',
+  density: localStorage.getItem(DENSITY_KEY) || 'comfortable',
+  systemDark: media ? media.matches : false,
 })
 
-// 应用主题到 DOM
-const applyTheme = (dark) => {
-  if (dark) {
-    document.documentElement.classList.add('dark')
-    document.body.classList.add('dark-mode')
-  } else {
-    document.documentElement.classList.remove('dark')
-    document.body.classList.remove('dark-mode')
-  }
-  localStorage.setItem('theme', dark ? 'dark' : 'light')
+function apply() {
+  const effective =
+    themeState.mode === 'system' ? (themeState.systemDark ? 'dark' : 'light') : themeState.mode
+  document.documentElement.setAttribute('data-theme', effective === 'dark' ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-density', themeState.density)
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', effective === 'dark' ? '#171a21' : '#ffffff')
 }
 
-// 切换主题
-const toggleTheme = () => {
-  isDark.value = !isDark.value
-  applyTheme(isDark.value)
+export function setTheme(mode) {
+  themeState.mode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light'
+  localStorage.setItem(THEME_KEY, themeState.mode)
+  apply()
 }
 
-// 初始化主题
-const initTheme = () => {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'dark') {
-    isDark.value = true
-    applyTheme(true)
-  } else if (saved === 'light') {
-    isDark.value = false
-    applyTheme(false)
-  } else {
-    // 跟随系统
-    isDark.value = mediaQuery.matches
-    applyTheme(isDark.value)
+export function setDensity(density) {
+  themeState.density = density === 'compact' ? 'compact' : 'comfortable'
+  localStorage.setItem(DENSITY_KEY, themeState.density)
+  apply()
+}
+
+export function toggleTheme() {
+  const current =
+    themeState.mode === 'system' ? (themeState.systemDark ? 'dark' : 'light') : themeState.mode
+  setTheme(current === 'dark' ? 'light' : 'dark')
+}
+
+export function initTheme() {
+  if (media) {
+    media.addEventListener('change', (event) => {
+      themeState.systemDark = event.matches
+      if (themeState.mode === 'system') apply()
+    })
   }
+  apply()
 }
 
 export function useTheme() {
-  return {
-    isDark,
-    toggleTheme,
-    initTheme
-  }
+  return { themeState, setTheme, setDensity, toggleTheme, initTheme }
 }

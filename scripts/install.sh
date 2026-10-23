@@ -97,7 +97,26 @@ read_with_default() {
     local prompt="$1" default="$2" var_name="$3" input
     read -r -p "$(echo -e "${CYAN}${prompt}${NC} [${default}]: ")" input
     if [ -z "$input" ]; then input="$default"; fi
-    eval "$var_name=\"\$input\""
+    printf -v "$var_name" '%s' "$input"
+}
+
+password_ok() {
+    local pw="$1"
+    [ ${#pw} -ge 8 ] || return 1
+    [[ "$pw" =~ [A-Za-z] ]] || return 1
+    [[ "$pw" =~ [0-9] ]] || return 1
+    return 0
+}
+
+random_password() {
+    local pw
+    while true; do
+        pw="$(head -c 64 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 16)"
+        if password_ok "$pw"; then
+            echo "$pw"
+            return
+        fi
+    done
 }
 
 read_password() {
@@ -106,13 +125,13 @@ read_password() {
         read -r -s -p "$(echo -e "${CYAN}${prompt}${NC}: ")" pw1
         echo ""
         if [ -z "$pw1" ]; then
-            pw1="$(head -c 9 /dev/urandom | base64 | tr -d '/+=' | head -c 12)"
+            pw1="$(random_password)"
             info "已生成随机密码: $pw1"
-            eval "$var_name=\"\$pw1\""
+            printf -v "$var_name" '%s' "$pw1"
             return
         fi
-        if [ ${#pw1} -lt 6 ]; then
-            warn "密码长度不能少于 6 位"
+        if ! password_ok "$pw1"; then
+            warn "密码至少 8 位，且必须同时包含字母和数字"
             continue
         fi
         read -r -s -p "$(echo -e "${CYAN}请再次输入密码${NC}: ")" pw2
@@ -121,7 +140,7 @@ read_password() {
             warn "两次输入不一致，请重试"
             continue
         fi
-        eval "$var_name=\"\$pw1\""
+        printf -v "$var_name" '%s' "$pw1"
         return
     done
 }
@@ -167,12 +186,10 @@ install_docker() {
     local script
     script="$(mktemp)"
     if ! curl -fsSL --connect-timeout 15 -o "$script" https://get.docker.com; then
-        warn "官方脚本下载失败，改用国内镜像"
-        if ! curl -fsSL --connect-timeout 15 -o "$script" https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo; then
-            error "Docker 安装脚本下载失败，请手动安装 Docker 后重新运行本脚本"
-            rm -f "$script"
-            return 1
-        fi
+        error "Docker 安装脚本下载失败，请手动安装 Docker 后重新运行本脚本"
+        error "参考: https://docs.docker.com/engine/install/"
+        rm -f "$script"
+        return 1
     fi
     sh "$script" || {
         error "Docker 安装失败，请手动安装后重新运行本脚本"
@@ -243,6 +260,11 @@ collect_options() {
 
     read -r -p "$(echo -e "${CYAN}安全入口（留空表示不启用，如设为 abc 则通过 /abc 访问）${NC}: ")" PANEL_ENTRY
     PANEL_ENTRY="$(echo "$PANEL_ENTRY" | tr -d ' ' | sed 's#^/##; s#/$##')"
+    while [ -n "$PANEL_ENTRY" ] && ! echo "$PANEL_ENTRY" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_/-]*$'; do
+        warn "安全入口只能包含字母、数字、-、_ 和 /，且不能以 - 开头"
+        read -r -p "$(echo -e "${CYAN}安全入口${NC}: ")" PANEL_ENTRY
+        PANEL_ENTRY="$(echo "$PANEL_ENTRY" | tr -d ' ' | sed 's#^/##; s#/$##')"
+    done
 
     echo ""
     title "──────────────── 网站网关 ────────────────"
@@ -261,6 +283,9 @@ collect_options() {
             [yY]*) ;;
             *) read_with_default "改用端口" "8088" GW_HTTP ;;
         esac
+    fi
+    if [ "$GW_HTTPS" != "$GW_HTTP" ] && port_in_use "$GW_HTTPS"; then
+        warn "HTTPS 端口 $GW_HTTPS 已被占用，部署证书后网关可能无法启动"
     fi
 
     echo ""
@@ -349,8 +374,17 @@ EOF
 
     # 用 up 命令写入 bcrypt 密码哈希
     if [ -x "$INSTALL_DIR/bin/up" ]; then
-        UPANEL_BASE_DIR="$INSTALL_DIR" "$INSTALL_DIR/bin/up" 9 password "$PANEL_PASS" >/dev/null 2>&1 \
-            || warn "密码初始化失败，可在安装后执行: $INSTALL_DIR/bin/up 9 password 新密码"
+        if ! UPANEL_BASE_DIR="$INSTALL_DIR" "$INSTALL_DIR/bin/up" 9 password "$PANEL_PASS" >/dev/null 2>&1; then
+            error "密码初始化失败。请执行: $INSTALL_DIR/bin/up 9 password '$PANEL_PASS'"
+            return 1
+        fi
+    else
+        error "安装包缺少 bin/up，无法初始化密码"
+        return 1
+    fi
+    if ! grep -q '"password_hash": "[^"]' "$INSTALL_DIR/data/config.json"; then
+        error "密码哈希未写入 config.json，安装中止"
+        return 1
     fi
 }
 
@@ -364,7 +398,7 @@ install_service() {
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
 Description=UPanel - Lightweight Docker Management Panel
-Documentation=https://github.com/upanel/upanel
+Documentation=https://github.com/likeweixue/UPanel
 After=network-online.target docker.service
 Wants=network-online.target
 
@@ -414,9 +448,12 @@ open_firewall() {
 }
 
 wait_for_panel() {
-    local port="$1" i
+    local port="$1" entry="" i
+    entry="$(sed -n 's/.*"security_entry": *"\([^"]*\)".*/\1/p' "$INSTALL_DIR/data/config.json" 2>/dev/null | head -n1)"
+    entry="${entry#/}"
+    [ -n "$entry" ] && entry="/$entry"
     for i in $(seq 1 30); do
-        if curl -fsS "http://127.0.0.1:${port}/api/panel/info" >/dev/null 2>&1; then
+        if curl --noproxy '*' -fsS "http://127.0.0.1:${port}${entry}/api/health" >/dev/null 2>&1; then
             return 0
         fi
         sleep 1
@@ -488,6 +525,9 @@ main() {
     if install_service; then
         open_firewall "$PANEL_PORT"
         open_firewall "$GW_HTTP"
+        if [ "$GW_HTTPS" != "$GW_HTTP" ]; then
+            open_firewall "$GW_HTTPS"
+        fi
         echo ""
         info "等待面板启动 ..."
         if wait_for_panel "$PANEL_PORT"; then

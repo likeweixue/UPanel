@@ -1,44 +1,26 @@
 import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import router from './router'
-import axios from 'axios'
 import App from './App.vue'
-import './style.css'
-import './themes/theme.css'
-import { initTheme } from './themes'
+import router from './router'
+import { initTheme } from './composables/useTheme'
+import { useAuth } from './composables/useAuth'
 
-// 配置 axios 拦截器
-axios.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+import './styles/tokens.css'
+import './styles/base.css'
+import './styles/components.css'
+import './styles/layout.css'
 
-axios.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
-
-// 初始化主题
 initTheme()
 
+// API 返回 401 时统一清理会话并回到登录页
+window.addEventListener('upanel:unauthorized', () => {
+  const { clear } = useAuth()
+  clear()
+  const current = router.currentRoute.value
+  if (current.path !== '/login') {
+    router.replace({ path: '/login', query: { redirect: current.fullPath } })
+  }
+})
+
 const app = createApp(App)
-
-// 注册所有图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
-
-app.use(ElementPlus)
 app.use(router)
 app.mount('#app')

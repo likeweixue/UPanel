@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"upanel/internal/service"
@@ -29,10 +31,22 @@ func (h *DatabaseHandler) Close() error {
 // unavailable 服务不可用时响应明确错误
 func (h *DatabaseHandler) unavailable(c *gin.Context) bool {
 	if h.err != nil || h.service == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Docker 未连接，无法执行该操作: " + h.err.Error()})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Docker 未连接，该功能暂不可用",
+			"code":  "docker_unavailable",
+		})
 		return true
 	}
 	return false
+}
+
+func dbNameParam(c *gin.Context) (string, bool) {
+	name := strings.TrimSpace(c.Param("name"))
+	if err := service.ValidateDatabaseName(name); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return "", false
+	}
+	return name, true
 }
 
 // 创建数据库
@@ -45,19 +59,19 @@ func (h *DatabaseHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	database, err := h.service.CreateDatabase(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
-	c.JSON(http.StatusOK, gin.H{"data": database})
+	c.JSON(http.StatusOK, gin.H{"data": database, "message": "数据库创建成功"})
 }
 
 // 获取数据库列表
 func (h *DatabaseHandler) List(c *gin.Context) {
-	if h.unavailable(c) {
+	if h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "数据库服务不可用", "code": "docker_unavailable"})
 		return
 	}
 	databases, err := h.service.ListDatabases()
@@ -76,13 +90,14 @@ func (h *DatabaseHandler) Start(c *gin.Context) {
 	if h.unavailable(c) {
 		return
 	}
-	name := c.Param("name")
-	
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	if err := h.service.StartDatabase(name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, gin.H{"message": "数据库已启动"})
 }
 
@@ -91,13 +106,14 @@ func (h *DatabaseHandler) Stop(c *gin.Context) {
 	if h.unavailable(c) {
 		return
 	}
-	name := c.Param("name")
-	
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	if err := h.service.StopDatabase(name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, gin.H{"message": "数据库已停止"})
 }
 
@@ -106,13 +122,14 @@ func (h *DatabaseHandler) Restart(c *gin.Context) {
 	if h.unavailable(c) {
 		return
 	}
-	name := c.Param("name")
-	
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	if err := h.service.RestartDatabase(name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, gin.H{"message": "数据库已重启"})
 }
 
@@ -121,40 +138,46 @@ func (h *DatabaseHandler) Delete(c *gin.Context) {
 	if h.unavailable(c) {
 		return
 	}
-	name := c.Param("name")
-	
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	keepData := c.Query("keep_data") == "1" || c.Query("keepData") == "true"
 	if err := h.service.DeleteDatabase(name, keepData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, gin.H{"message": "数据库已删除"})
 }
 
 // 获取连接信息
 func (h *DatabaseHandler) GetConnectionInfo(c *gin.Context) {
-	if h.unavailable(c) {
+	if h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "数据库服务不可用", "code": "docker_unavailable"})
 		return
 	}
-	name := c.Param("name")
-	
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	info, err := h.service.ConnectionInfo(name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, gin.H{"data": info})
 }
 
 // Get 数据库详情
 func (h *DatabaseHandler) Get(c *gin.Context) {
-	if h.unavailable(c) {
+	if h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "数据库服务不可用", "code": "docker_unavailable"})
 		return
 	}
-	name := c.Param("name")
-
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
 	db, err := h.service.GetDatabase(name)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -168,9 +191,17 @@ func (h *DatabaseHandler) Logs(c *gin.Context) {
 	if h.unavailable(c) {
 		return
 	}
-	name := c.Param("name")
-
-	logs, err := h.service.Logs(name, 200)
+	name, ok := dbNameParam(c)
+	if !ok {
+		return
+	}
+	tail := 200
+	if v := c.Query("tail"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			tail = n
+		}
+	}
+	logs, err := h.service.Logs(name, tail)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

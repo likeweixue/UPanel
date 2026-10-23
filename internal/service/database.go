@@ -1,16 +1,16 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"upanel/internal/config"
 )
 
@@ -22,7 +22,7 @@ type Database struct {
 	Status    string    `json:"status"`
 	Port      int       `json:"port"`
 	Username  string    `json:"username"`
-	Password  string    `json:"password"`
+	Password  string    `json:"password,omitempty"`
 	Database  string    `json:"database"`
 	Container string    `json:"container"`
 	Path      string    `json:"path"`
@@ -47,21 +47,36 @@ type DatabaseService struct {
 
 // NewDatabaseService 创建数据库服务
 func NewDatabaseService() (*DatabaseService, error) {
-	rt, err := NewRuntime()
-	if err != nil {
-		return nil, err
-	}
 	cfg := config.Current()
 	if err := os.MkdirAll(cfg.DatabasePath, 0755); err != nil {
-		rt.Close()
 		return nil, fmt.Errorf("创建数据库目录失败: %w", err)
 	}
-	return &DatabaseService{rt: rt, cfg: cfg}, nil
+	s := &DatabaseService{cfg: cfg}
+	rt, err := NewRuntime()
+	if err != nil {
+		return s, err
+	}
+	s.rt = rt
+	return s, nil
+}
+
+func (s *DatabaseService) dockerReady() error {
+	if s.rt == nil {
+		return fmt.Errorf("Docker 未连接，无法执行该操作")
+	}
+	return nil
 }
 
 func (s *DatabaseService) Close() error {
+	if s.rt == nil {
+		return nil
+	}
 	return s.rt.Close()
 }
+
+var dbNameRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]{0,31}$`)
+var dbIdentifierRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{0,63}$`)
+var dbVersionRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,31}$`)
 
 // containerName 数据库容器名
 func (s *DatabaseService) containerName(name string) string {
@@ -89,43 +104,32 @@ func (s *DatabaseService) imageFor(dbType, version string) string {
 	case "postgres", "postgresql":
 		return "postgres:" + version
 	case "redis":
+		if strings.HasSuffix(version, "-alpine") {
+			return "redis:" + version
+		}
 		return "redis:" + version + "-alpine"
 	default:
 		return "mysql:" + version
 	}
 }
 
-// usedHostPorts 收集已被容器占用的宿主机端口
-func (s *DatabaseService) usedHostPorts() map[int]bool {
-	used := map[int]bool{}
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	list, err := s.rt.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
-	if err != nil {
-		return used
-	}
-	for _, c := range list {
-		for _, p := range c.Ports {
-			if p.PublicPort > 0 {
-				used[int(p.PublicPort)] = true
-			}
-		}
-	}
-	return used
-}
-
-// allocPort 选定可用端口：优先使用请求端口，冲突时向上顺延
+// allocPort 选定可用端口：优先使用请求端口；被占用时向上顺延。
+// 同时检查宿主机监听端口和已有容器映射，避免容器启动后端口冲突。
 func (s *DatabaseService) allocPort(want int) (int, error) {
-	used := s.usedHostPorts()
-	if want > 0 && !used[want] {
-		return want, nil
+	if want > 0 {
+		if want > 65535 {
+			return 0, fmt.Errorf("端口必须是 1-65535 之间的数字")
+		}
+		if !s.rt.HostPortOccupied(want) {
+			return want, nil
+		}
 	}
 	start := want
 	if start <= 0 {
 		start = 3306
 	}
-	for p := start; p < start+200; p++ {
-		if !used[p] {
+	for p := start; p < start+200 && p <= 65535; p++ {
+		if !s.rt.HostPortOccupied(p) {
 			return p, nil
 		}
 	}
@@ -134,12 +138,15 @@ func (s *DatabaseService) allocPort(want int) (int, error) {
 
 // CreateDatabase 创建并启动数据库
 func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database, error) {
+	if err := s.dockerReady(); err != nil {
+		return nil, err
+	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return nil, fmt.Errorf("数据库名称不能为空")
 	}
-	if strings.ContainsAny(name, "/ .") {
-		return nil, fmt.Errorf("数据库名称不能包含空格、斜杠或点号")
+	if !dbNameRe.MatchString(name) {
+		return nil, fmt.Errorf("数据库名称只能包含字母、数字、- 和 _，且必须以字母开头（最多 32 位）")
 	}
 
 	dbType := strings.ToLower(strings.TrimSpace(req.Type))
@@ -156,11 +163,19 @@ func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database,
 		return nil, fmt.Errorf("不支持的数据库类型: %s（可选 mysql / postgres / redis）", req.Type)
 	}
 
+	version := strings.TrimSpace(req.Version)
+	if version != "" && !dbVersionRe.MatchString(version) {
+		return nil, fmt.Errorf("版本号包含非法字符")
+	}
+
 	if _, err := os.Stat(s.metaPath(name)); err == nil {
 		return nil, fmt.Errorf("数据库 %s 已存在", name)
 	}
 
-	_, _, defPort, defUser, _ := defaults(dbType)
+	_, dataDir, defPort, defUser, defVer := defaults(dbType)
+	if version == "" {
+		version = defVer
+	}
 	port, err := s.allocPort(firstPositive(req.Port, defPort))
 	if err != nil {
 		return nil, err
@@ -168,29 +183,42 @@ func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database,
 
 	password := strings.TrimSpace(req.Password)
 	if password == "" {
-		password = config.RandomPassword(16)
+		password = config.RandomPassword(20)
 	}
+	if len(password) < 8 || len(password) > 128 {
+		return nil, fmt.Errorf("数据库密码长度必须在 8-128 位之间")
+	}
+	if strings.ContainsAny(password, "\r\n\x00") {
+		return nil, fmt.Errorf("数据库密码包含非法字符")
+	}
+
 	dbName := strings.TrimSpace(req.Database)
 	if dbName == "" {
-		dbName = name
+		// 实例名允许连字符，但 SQL 标识符统一用下划线
+		dbName = strings.ReplaceAll(name, "-", "_")
+	}
+	if !dbIdentifierRe.MatchString(dbName) {
+		return nil, fmt.Errorf("数据库名只能包含字母、数字和下划线，且必须以字母开头")
 	}
 
-	image := s.imageFor(dbType, req.Version)
-	version := req.Version
-	if version == "" {
-		_, _, _, _, v := defaults(dbType)
-		version = v
-	}
-
+	image := s.imageFor(dbType, version)
 	dbPath := filepath.Join(s.cfg.DatabasePath, name)
+	dbPathExisted := dirExists(dbPath)
 	dataPath := filepath.Join(dbPath, "data")
 	if err := os.MkdirAll(dataPath, 0755); err != nil {
 		return nil, fmt.Errorf("创建数据目录失败: %w", err)
 	}
-
-	_, dataDir, _, _, _ := defaults(dbType)
+	switch dbType {
+	case "mysql":
+		prepareMySQLDir(dataPath)
+	case "postgres":
+		preparePostgresDir(dataPath)
+	case "redis":
+		prepareRedisDir(dataPath)
+	}
 
 	var env []string
+	var cmd []string
 	switch dbType {
 	case "mysql":
 		env = []string{
@@ -204,12 +232,14 @@ func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database,
 			"POSTGRES_USER=" + defUser,
 		}
 	case "redis":
-		env = []string{
-			"REDIS_PASSWORD=" + password,
-		}
+		// 官方 redis 镜像不识别 REDIS_PASSWORD，必须显式通过命令行启用认证。
+		cmd = []string{"redis-server", "--requirepass", password, "--appendonly", "yes"}
 	}
 
 	if err := s.rt.PullImage(image, nil); err != nil {
+		if !dbPathExisted {
+			_ = os.RemoveAll(dbPath)
+		}
 		return nil, err
 	}
 
@@ -217,19 +247,23 @@ func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database,
 		Name:  s.containerName(name),
 		Image: image,
 		Env:   env,
+		Cmd:   cmd,
 		Volumes: map[string]string{
 			dataPath: dataDir,
 		},
 		Ports: map[string]string{
 			fmt.Sprintf("%d/tcp", defPort): fmt.Sprintf("%d", port),
 		},
-	}
-	if dbType == "redis" && false {
-		// redis 官方镜像不支持 REDIS_PASSWORD 环境变量，保持无密码启动
-		spec.Cmd = nil
+		// 数据库默认只监听 127.0.0.1，避免 MySQL/Redis 直接暴露到公网。
+		// 确实需要远程访问时，请通过 SSH 隧道或自行调整防火墙/端口映射。
+		BindLocalhost: true,
+		Labels:        map[string]string{"managed-by": "upanel", "upanel-db": name},
 	}
 
 	if _, err := s.rt.CreateAndStart(spec); err != nil {
+		if !dbPathExisted {
+			_ = os.RemoveAll(dbPath)
+		}
 		return nil, err
 	}
 
@@ -247,6 +281,10 @@ func (s *DatabaseService) CreateDatabase(req *CreateDatabaseRequest) (*Database,
 		CreatedAt: time.Now(),
 	}
 	if err := s.saveMeta(db); err != nil {
+		_ = s.rt.Remove(spec.Name)
+		if !dbPathExisted {
+			_ = os.RemoveAll(dbPath)
+		}
 		return nil, err
 	}
 	return db, nil
@@ -260,6 +298,9 @@ func firstPositive(v, def int) int {
 }
 
 func (s *DatabaseService) metaPath(name string) string {
+	if !dbNameRe.MatchString(name) {
+		return ""
+	}
 	return filepath.Join(s.cfg.DatabasePath, name, "db.json")
 }
 
@@ -268,11 +309,18 @@ func (s *DatabaseService) saveMeta(db *Database) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.metaPath(db.Name), data, 0600)
+	if err := os.MkdirAll(filepath.Join(s.cfg.DatabasePath, db.Name), 0755); err != nil {
+		return err
+	}
+	return writeFileAtomic(s.metaPath(db.Name), data, 0600)
 }
 
 func (s *DatabaseService) loadMeta(name string) (*Database, error) {
-	data, err := os.ReadFile(s.metaPath(name))
+	p := s.metaPath(name)
+	if p == "" {
+		return nil, fmt.Errorf("数据库名称不合法")
+	}
+	data, err := os.ReadFile(p)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +340,7 @@ func (s *DatabaseService) ListDatabases() ([]Database, error) {
 		}
 		return nil, err
 	}
-	var list []Database
+	list := make([]Database, 0, len(entries))
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -302,6 +350,7 @@ func (s *DatabaseService) ListDatabases() ([]Database, error) {
 			continue
 		}
 		d.Status = s.statusOf(d)
+		d.Password = "" // 列表接口不返回密码，凭据通过连接信息接口单独获取
 		list = append(list, *d)
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
@@ -309,6 +358,9 @@ func (s *DatabaseService) ListDatabases() ([]Database, error) {
 }
 
 func (s *DatabaseService) statusOf(d *Database) string {
+	if s.rt == nil {
+		return "docker_unavailable"
+	}
 	st := s.rt.ContainerState(d.Container)
 	if st == "running" {
 		return "running"
@@ -326,26 +378,36 @@ func (s *DatabaseService) GetDatabase(name string) (*Database, error) {
 		return nil, fmt.Errorf("数据库 %s 不存在", name)
 	}
 	d.Status = s.statusOf(d)
+	d.Password = ""
 	return d, nil
 }
 
 // StartDatabase 启动
 func (s *DatabaseService) StartDatabase(name string) error {
+	if err := s.dockerReady(); err != nil {
+		return err
+	}
 	d, err := s.loadMeta(name)
 	if err != nil {
 		return fmt.Errorf("数据库 %s 不存在", name)
 	}
 	if s.rt.ContainerState(d.Container) == "" {
-		return fmt.Errorf("容器 %s 已不存在，请重新创建", d.Container)
+		return fmt.Errorf("容器 %s 已不存在，请删除后重新创建", d.Container)
 	}
 	return s.rt.Start(d.Container)
 }
 
 // StopDatabase 停止
 func (s *DatabaseService) StopDatabase(name string) error {
+	if err := s.dockerReady(); err != nil {
+		return err
+	}
 	d, err := s.loadMeta(name)
 	if err != nil {
 		return fmt.Errorf("数据库 %s 不存在", name)
+	}
+	if s.rt.ContainerState(d.Container) == "" {
+		return fmt.Errorf("容器 %s 已不存在", d.Container)
 	}
 	return s.rt.Stop(d.Container)
 }
@@ -355,12 +417,15 @@ func (s *DatabaseService) RestartDatabase(name string) error {
 	if err := s.StopDatabase(name); err != nil {
 		return err
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	return s.StartDatabase(name)
 }
 
 // DeleteDatabase 删除（keepData=true 时保留数据目录）
 func (s *DatabaseService) DeleteDatabase(name string, keepData bool) error {
+	if err := s.dockerReady(); err != nil {
+		return err
+	}
 	d, err := s.loadMeta(name)
 	if err != nil {
 		return fmt.Errorf("数据库 %s 不存在", name)
@@ -380,6 +445,7 @@ func (s *DatabaseService) ConnectionInfo(name string) (map[string]string, error)
 	if err != nil {
 		return nil, fmt.Errorf("数据库 %s 不存在", name)
 	}
+	pass := url.QueryEscape(d.Password)
 	info := map[string]string{
 		"host":     "127.0.0.1",
 		"port":     fmt.Sprintf("%d", d.Port),
@@ -389,50 +455,35 @@ func (s *DatabaseService) ConnectionInfo(name string) (map[string]string, error)
 		"type":     d.Type,
 		"status":   s.statusOf(d),
 	}
-	if d.Type == "mysql" {
-		info["dsn"] = fmt.Sprintf("mysql://%s:%s@127.0.0.1:%d/%s", d.Username, d.Password, d.Port, d.Database)
-	} else if d.Type == "postgres" {
-		info["dsn"] = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", d.Username, d.Password, d.Port, d.Database)
-	} else {
-		info["dsn"] = fmt.Sprintf("redis://127.0.0.1:%d", d.Port)
+	switch d.Type {
+	case "mysql":
+		info["dsn"] = fmt.Sprintf("mysql://%s:%s@127.0.0.1:%d/%s", d.Username, pass, d.Port, d.Database)
+	case "postgres":
+		info["dsn"] = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s?sslmode=disable", d.Username, pass, d.Port, d.Database)
+	default:
+		info["dsn"] = fmt.Sprintf("redis://:%s@127.0.0.1:%d/0", pass, d.Port)
 	}
+	info["hint"] = "数据库仅监听 127.0.0.1，远程访问请使用 SSH 隧道：ssh -L " +
+		fmt.Sprintf("%d:127.0.0.1:%d", d.Port, d.Port) + " root@服务器IP"
 	return info, nil
 }
 
 // Logs 获取数据库容器日志
 func (s *DatabaseService) Logs(name string, tail int) (string, error) {
+	if err := s.dockerReady(); err != nil {
+		return "", err
+	}
 	d, err := s.loadMeta(name)
 	if err != nil {
 		return "", fmt.Errorf("数据库 %s 不存在", name)
 	}
-	if tail <= 0 {
-		tail = 200
-	}
-	ctx := context.Background()
-	opts := types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Tail:       fmt.Sprintf("%d", tail),
-	}
-	info, err := s.rt.FindContainer(d.Container)
-	if err != nil {
-		return "", err
-	}
-	rc, err := s.rt.cli.ContainerLogs(ctx, info.ID, opts)
-	if err != nil {
-		return "", err
-	}
-	defer rc.Close()
-	buf := make([]byte, 0)
-	tmp := make([]byte, 4096)
-	for {
-		n, err := rc.Read(tmp)
-		buf = append(buf, tmp[:n]...)
-		if err != nil {
-			break
-		}
-	}
-	return string(buf), nil
+	return s.rt.Logs(d.Container, tail)
 }
 
-var _ = strings.TrimSpace
+// ValidateDatabaseName 供 handler 校验路径中的数据库名
+func ValidateDatabaseName(name string) error {
+	if !dbNameRe.MatchString(name) {
+		return fmt.Errorf("数据库名称只能包含字母、数字、- 和 _，且必须以字母开头")
+	}
+	return nil
+}

@@ -1,65 +1,150 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { baseHref } from '@/api'
+import { authState, useAuth } from '@/composables/useAuth'
 
-const isAuthenticated = () => {
-  return !!localStorage.getItem('token')
-}
+const layout = () => import('@/layouts/AdminLayout.vue')
 
 const routes = [
   {
     path: '/login',
-    name: 'Login',
-    component: () => import('@/views/auth/Login.vue'),
-    meta: { public: true }
+    name: 'login',
+    component: () => import('@/views/Login.vue'),
+    meta: { public: true, title: '登录' },
   },
   {
     path: '/',
-    component: () => import('@/layouts/MainLayout.vue'),
+    component: layout,
     meta: { requiresAuth: true },
     redirect: '/dashboard',
     children: [
-      { path: 'dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '总览' } },
-      { path: 'containers', component: () => import('@/views/Containers.vue'), meta: { title: '容器管理' } },
-      { path: 'apps', component: () => import('@/views/Apps.vue'), meta: { title: '应用商店' } },
-      { path: 'websites', component: () => import('@/views/Websites.vue'), meta: { title: '网站' } },
-      { path: 'databases', component: () => import('@/views/Databases.vue'), meta: { title: '数据库' } },
-      { path: 'files', component: () => import('@/views/Files.vue'), meta: { title: '文件管理' } },
-      { path: 'monitor', component: () => import('@/views/monitor/Index.vue'), meta: { title: '监控' } },
-      { path: 'ssh', component: () => import('@/views/Ssh.vue'), meta: { title: 'SSH管理' } },
-      { path: 'security', component: () => import('@/views/Security.vue'), meta: { title: '安全设置' } },
-      // 工具箱子菜单
-      { path: 'email-notify', component: () => import('@/views/toolbox/EmailNotify.vue'), meta: { title: '邮件通知' } },
-      { path: 'cron', component: () => import('@/views/Cron.vue'), meta: { title: '计划任务' } },
-      { path: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '面板设置' } },
-      { path: 'logout', component: () => import('@/views/Logout.vue'), meta: { title: '退出面板' } }
-    ]
-  }
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: () => import('@/views/Dashboard.vue'),
+        meta: { title: '总览' },
+      },
+      {
+        path: 'websites',
+        name: 'websites',
+        component: () => import('@/views/Websites.vue'),
+        meta: { title: '网站' },
+      },
+      {
+        path: 'databases',
+        name: 'databases',
+        component: () => import('@/views/Databases.vue'),
+        meta: { title: '数据库' },
+      },
+      {
+        path: 'apps',
+        name: 'apps',
+        component: () => import('@/views/Apps.vue'),
+        meta: { title: '应用商店' },
+      },
+      {
+        path: 'containers',
+        name: 'containers',
+        component: () => import('@/views/Containers.vue'),
+        meta: { title: '容器' },
+      },
+      {
+        path: 'files',
+        name: 'files',
+        component: () => import('@/views/Files.vue'),
+        meta: { title: '文件管理' },
+      },
+      {
+        path: 'monitor',
+        name: 'monitor',
+        component: () => import('@/views/Monitor.vue'),
+        meta: { title: '资源监控' },
+      },
+      {
+        path: 'security',
+        name: 'security',
+        component: () => import('@/views/Security.vue'),
+        meta: { title: '安全中心' },
+      },
+      {
+        path: 'cron',
+        name: 'cron',
+        component: () => import('@/views/Cron.vue'),
+        meta: { title: '计划任务' },
+      },
+      {
+        path: 'ssh',
+        name: 'ssh',
+        component: () => import('@/views/Ssh.vue'),
+        meta: { title: 'SSH 服务' },
+      },
+      {
+        path: 'email-notify',
+        name: 'email',
+        component: () => import('@/views/EmailNotify.vue'),
+        meta: { title: '邮件通知' },
+      },
+      {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('@/views/Settings.vue'),
+        meta: { title: '面板设置' },
+      },
+      {
+        path: 'logout',
+        name: 'logout',
+        component: () => import('@/views/Logout.vue'),
+        meta: { title: '退出登录' },
+      },
+    ],
+  },
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
+  history: createWebHistory(baseHref),
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, top: 80, behavior: 'smooth' }
+    return { top: 0 }
+  },
 })
 
-router.beforeEach((to, from, next) => {
-  if (to.path === '/login' && isAuthenticated()) {
-    next('/')
-    return
+router.beforeEach(async (to) => {
+  const authed = !!authState.token
+  if (to.meta.public) {
+    if (to.path === '/login' && authed) {
+      const { fetchMe, clear } = useAuth()
+      if (!authState.user) {
+        try {
+          await fetchMe()
+        } catch (error) {
+          clear()
+          return true
+        }
+      }
+      return { path: '/dashboard' }
+    }
+    return true
   }
-  if (to.meta.requiresAuth && !isAuthenticated()) {
-    next('/login')
-    return
+  if (!authed) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
-  next()
+  if (!authState.user) {
+    const { fetchMe, clear } = useAuth()
+    try {
+      await fetchMe()
+    } catch (error) {
+      clear()
+      return { path: '/login', query: { redirect: to.fullPath } }
+    }
+  }
+  return true
+})
+
+router.afterEach((to) => {
+  const title = (to.meta && to.meta.title) || 'UPanel'
+  document.title = `${title} · UPanel`
 })
 
 export default router
-
-// 在路由守卫中重新应用主题
-router.afterEach(() => {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'davinci') {
-    import('@/themes').then(({ applyTheme }) => {
-      applyTheme('davinci')
-    })
-  }
-})

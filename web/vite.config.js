@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 export default defineConfig({
+  // 使用相对路径 + 服务端注入的 <base>，确保安全入口（/entry/）下资源仍能加载
+  base: './',
   plugins: [vue()],
   resolve: {
     alias: {
@@ -17,5 +19,10 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  build: {
+    target: 'es2019',
+    chunkSizeWarningLimit: 900,
+    cssCodeSplit: true,
+  },
 })
