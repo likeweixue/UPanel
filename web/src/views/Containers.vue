@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -204,6 +205,7 @@
         </div>
       </div>
     </UTabs>
+    </div>
 
     <!-- 日志 -->
     <UModal v-model="logsOpen" :title="`${logsContainer?.name || ''} · 容器日志`" size="xl">

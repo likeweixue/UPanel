@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -172,6 +173,7 @@
         </div>
       </div>
     </UTabs>
+    </div>
 
     <!-- 安装 -->
     <UModal

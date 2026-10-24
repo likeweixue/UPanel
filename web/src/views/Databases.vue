@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -191,6 +192,7 @@
         </div>
       </div>
     </UTabs>
+    </div>
 
     <!-- 创建 -->
     <UModal v-model="createOpen" title="创建数据库" description="容器创建完成后会自动生成随机凭据（可自定义）" size="lg" :busy="submitting" @close="clearCreateQuery">

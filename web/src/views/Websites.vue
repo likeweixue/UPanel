@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -367,6 +368,7 @@
         </div>
       </div>
     </UTabs>
+    </div>
 
     <!-- 创建网站 -->
     <UModal v-model="createOpen" title="创建网站" description="站点创建后会自动生成默认首页并接入网关" size="lg" :busy="submitting" @close="clearActionQuery">

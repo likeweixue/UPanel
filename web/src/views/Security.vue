@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -206,6 +207,7 @@
         </div>
       </div>
     </UTabs>
+    </div>
 
     <!-- 修改密码 -->
     <UModal v-model="passwordOpen" title="修改管理员密码" description="修改成功后所有已登录会话会立即失效" size="md" :busy="passwordSubmitting">

@@ -1,17 +1,18 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
           <h1 class="page__title">面板设置</h1>
           <span class="badge">{{ panelInfo.version || '—' }}</span>
         </div>
-        <p class="page__subtitle">账号、端口、安全入口、网关与 Docker 配置</p>
+        <p class="page__subtitle">账号、端口、安全入口、网关、Docker 与外观</p>
       </div>
       <div class="page__actions">
         <UButton icon="refresh" label="重新加载" :loading="loading" @click="loadAll" />
         <UButton
-          v-if="['panel', 'gateway'].includes(activeTab)"
+          v-if="['panel', 'gateway', 'appearance'].includes(activeTab)"
           variant="primary"
           icon="save"
           label="保存设置"
@@ -293,6 +294,42 @@
           </div>
         </UWidget>
 
+        <UWidget title="界面圆角" subtitle="0 为直角，默认 4px" icon="grid" :span="6">
+          <div class="stack">
+            <div class="radius-preview" :style="{ borderRadius: `${settings.cornerRadius}px` }">
+              <span class="radius-preview__bar" :style="{ borderRadius: `${settings.cornerRadius}px` }" />
+              <span class="radius-preview__panel" :style="{ borderRadius: `${settings.cornerRadius}px` }">
+                <span class="radius-preview__line" />
+                <span class="radius-preview__line radius-preview__line--short" />
+              </span>
+              <span class="radius-preview__value">{{ settings.cornerRadius }} px</span>
+            </div>
+            <input
+              class="range"
+              type="range"
+              min="0"
+              max="16"
+              step="1"
+              :value="settings.cornerRadius"
+              aria-label="界面圆角"
+              @input="chooseRadius($event.target.value)"
+            />
+            <div class="radius-presets">
+              <button
+                v-for="value in radiusOptions"
+                :key="value"
+                type="button"
+                class="radius-chip"
+                :class="{ 'is-active': settings.cornerRadius === value }"
+                @click="chooseRadius(value)"
+              >
+                {{ value }}px
+              </button>
+            </div>
+            <p class="field__hint">同时影响卡片、按钮、输入框、标签页和弹窗，保存后同步到服务器。</p>
+          </div>
+        </UWidget>
+
         <UWidget title="预览" subtitle="组件样式示例" icon="grid" :span="6">
           <div class="stack">
             <div class="row">
@@ -312,6 +349,40 @@
             <div class="alert alert--info">
               <UIcon name="info" :size="16" class="alert__icon" />
               <div class="alert__body">这是信息提示样式</div>
+            </div>
+          </div>
+        </UWidget>
+
+        <UWidget title="底部栏" subtitle="版本号与项目地址" icon="list" :span="6">
+          <div class="stack">
+            <div class="setting-row">
+              <div>
+                <strong>显示底部栏</strong>
+                <p class="field__hint">关闭后页面底部不再显示信息栏</p>
+              </div>
+              <USwitch v-model="settings.footerVisible" aria-label="显示底部栏" />
+            </div>
+            <UField label="左侧文字" for-id="footer-text" hint="留空时显示 UPanel">
+              <UInput id="footer-text" v-model="settings.footerText" placeholder="UPanel" maxlength="80" />
+            </UField>
+            <div class="setting-row">
+              <div><strong>显示版本号</strong></div>
+              <USwitch v-model="settings.footerShowVersion" aria-label="显示版本号" />
+            </div>
+            <div class="setting-row">
+              <div>
+                <strong>显示 GitHub 链接</strong>
+                <p class="field__hint">https://github.com/likeweixue/UPanel</p>
+              </div>
+              <USwitch v-model="settings.footerShowGithub" aria-label="显示 GitHub 链接" />
+            </div>
+            <div v-if="settings.footerVisible" class="footer-preview" aria-hidden="true">
+              <span>{{ settings.footerText || 'UPanel' }}</span>
+              <span v-if="settings.footerShowVersion" class="subtle">{{ panelInfo.version || 'v0.1.7' }}</span>
+              <span class="grow" />
+              <span v-if="settings.footerShowGithub" class="row" style="gap: 4px">
+                <UIcon name="github" :size="13" /> GitHub
+              </span>
             </div>
           </div>
         </UWidget>
@@ -379,6 +450,7 @@
         </UWidget>
       </div>
     </UTabs>
+    </div>
   </div>
 </template>
 
@@ -391,12 +463,13 @@ import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
+import USwitch from '@/components/ui/USwitch.vue'
 import UTabs from '@/components/ui/UTabs.vue'
 import UTextarea from '@/components/ui/UTextarea.vue'
 import UWidget from '@/components/ui/UWidget.vue'
 import { authApi, dockerApi, errText, gatewayApi, panelApi, settingsApi } from '@/api'
 import { useAuth } from '@/composables/useAuth'
-import { useTheme } from '@/composables/useTheme'
+import { setCornerRadius, useTheme } from '@/composables/useTheme'
 import { toastError, toastSuccess, toastWarning } from '@/composables/useToast'
 
 const route = useRoute()
@@ -444,6 +517,11 @@ const settings = reactive({
   registryMirrors: [],
   theme: 'light',
   density: 'comfortable',
+  cornerRadius: 4,
+  footerVisible: true,
+  footerText: '',
+  footerShowVersion: true,
+  footerShowGithub: true,
 })
 const mirrorsText = ref('')
 
@@ -472,6 +550,7 @@ const densityOptions = [
   { value: 'comfortable', label: '标准密度' },
   { value: 'compact', label: '紧凑密度' },
 ]
+const radiusOptions = [0, 2, 4, 6, 8, 12, 16]
 
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const changingPassword = ref(false)
@@ -493,6 +572,12 @@ function applySettings(data) {
   mirrorsText.value = settings.registryMirrors.join('\n')
   settings.theme = data.theme || 'light'
   settings.density = data.density || 'comfortable'
+  settings.cornerRadius = Number.isFinite(Number(data.cornerRadius)) ? Number(data.cornerRadius) : 4
+  setCornerRadius(settings.cornerRadius)
+  settings.footerVisible = data.footerVisible !== false
+  settings.footerText = data.footerText || ''
+  settings.footerShowVersion = data.footerShowVersion !== false
+  settings.footerShowGithub = data.footerShowGithub !== false
 }
 
 async function loadAll() {
@@ -559,6 +644,11 @@ function buildSettingsPayload() {
     registryMirrors: settings.registryMirrors,
     theme: settings.theme,
     density: settings.density,
+    cornerRadius: settings.cornerRadius,
+    footerVisible: settings.footerVisible,
+    footerText: settings.footerText,
+    footerShowVersion: settings.footerShowVersion,
+    footerShowGithub: settings.footerShowGithub,
   }
 }
 
@@ -571,6 +661,7 @@ async function saveSettings() {
   try {
     const res = await settingsApi.update(buildSettingsPayload())
     applySettings(res.data)
+    window.dispatchEvent(new CustomEvent('upanel:settings-updated', { detail: res.data }))
     message.value = res.message || '设置已保存'
     restartRequired.value = !!res.restartRequired
     if (restartRequired.value) toastWarning('设置已保存', '需要重启面板后生效')
@@ -680,6 +771,12 @@ function chooseDensity(density) {
   setDensity(density)
   settings.density = density
   toastSuccess('界面密度已更新')
+}
+
+function chooseRadius(value) {
+  const px = Math.min(16, Math.max(0, Math.round(Number(value) || 0)))
+  settings.cornerRadius = px
+  setCornerRadius(px)
 }
 
 watch(activeTab, (tab) => {

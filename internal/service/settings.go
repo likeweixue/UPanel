@@ -35,9 +35,14 @@ type Settings struct {
 	RegistryMirrors []string `json:"registryMirrors"`
 
 	// 界面
-	Theme    string `json:"theme"`
-	Language string `json:"language"`
-	Density  string `json:"density"`
+	Theme             string  `json:"theme"`
+	Language          string  `json:"language"`
+	Density           string  `json:"density"`
+	CornerRadius      *int    `json:"cornerRadius"`
+	FooterVisible     *bool   `json:"footerVisible"`
+	FooterText        *string `json:"footerText"`
+	FooterShowVersion *bool   `json:"footerShowVersion"`
+	FooterShowGithub  *bool   `json:"footerShowGithub"`
 }
 
 // SettingsService 设置服务
@@ -71,22 +76,31 @@ func NewSettingsService() *SettingsService {
 
 func defaultSettings(cfg *config.Config) *Settings {
 	return &Settings{
-		PanelName:        "UPanel",
-		PanelPort:        cfg.Port,
-		BindIP:           cfg.BindIP,
-		SecurityEntry:    cfg.GetSecurityEntry(),
-		WebsitePath:      cfg.WebsitePath,
-		DatabasePath:     cfg.DatabasePath,
-		AppPath:          cfg.AppPath,
-		GatewayImage:     cfg.GatewayImage,
-		GatewayHTTPPort:  cfg.GatewayHTTPPort,
-		GatewayHTTPSPort: cfg.GatewayHTTPSPort,
-		RegistryMirrors:  append([]string{}, cfg.RegistryMirrors...),
-		Theme:            "light",
-		Language:         "zh-CN",
-		Density:          "comfortable",
+		PanelName:         "UPanel",
+		PanelPort:         cfg.Port,
+		BindIP:            cfg.BindIP,
+		SecurityEntry:     cfg.GetSecurityEntry(),
+		WebsitePath:       cfg.WebsitePath,
+		DatabasePath:      cfg.DatabasePath,
+		AppPath:           cfg.AppPath,
+		GatewayImage:      cfg.GatewayImage,
+		GatewayHTTPPort:   cfg.GatewayHTTPPort,
+		GatewayHTTPSPort:  cfg.GatewayHTTPSPort,
+		RegistryMirrors:   append([]string{}, cfg.RegistryMirrors...),
+		Theme:             "light",
+		Language:          "zh-CN",
+		Density:           "comfortable",
+		CornerRadius:      ptrInt(4),
+		FooterVisible:     ptrBool(true),
+		FooterText:        ptrString(""),
+		FooterShowVersion: ptrBool(true),
+		FooterShowGithub:  ptrBool(true),
 	}
 }
+
+func ptrBool(v bool) *bool       { return &v }
+func ptrInt(v int) *int          { return &v }
+func ptrString(v string) *string { return &v }
 
 func (s *SettingsService) load() {
 	data, err := os.ReadFile(s.path)
@@ -139,6 +153,21 @@ func (s *SettingsService) load() {
 	if disk.Density != "" {
 		s.settings.Density = disk.Density
 	}
+	if disk.CornerRadius != nil {
+		s.settings.CornerRadius = disk.CornerRadius
+	}
+	if disk.FooterVisible != nil {
+		s.settings.FooterVisible = disk.FooterVisible
+	}
+	if disk.FooterText != nil {
+		s.settings.FooterText = disk.FooterText
+	}
+	if disk.FooterShowVersion != nil {
+		s.settings.FooterShowVersion = disk.FooterShowVersion
+	}
+	if disk.FooterShowGithub != nil {
+		s.settings.FooterShowGithub = disk.FooterShowGithub
+	}
 }
 
 func (s *SettingsService) save() error {
@@ -156,6 +185,11 @@ func (s *SettingsService) save() error {
 func (s *SettingsService) GetAll() *Settings {
 	cp := *s.settings
 	cp.RegistryMirrors = append([]string{}, s.settings.RegistryMirrors...)
+	cp.CornerRadius = ptrInt(*s.settings.CornerRadius)
+	cp.FooterVisible = ptrBool(*s.settings.FooterVisible)
+	cp.FooterText = ptrString(*s.settings.FooterText)
+	cp.FooterShowVersion = ptrBool(*s.settings.FooterShowVersion)
+	cp.FooterShowGithub = ptrBool(*s.settings.FooterShowGithub)
 	return &cp
 }
 
@@ -381,6 +415,28 @@ func (s *SettingsService) Update(patch *Settings) (bool, error) {
 	}
 	if patch.Density != "" {
 		s.settings.Density = patch.Density
+	}
+	if patch.CornerRadius != nil {
+		if *patch.CornerRadius < 0 || *patch.CornerRadius > 16 {
+			return false, fmt.Errorf("界面圆角必须在 0-16px 之间")
+		}
+		s.settings.CornerRadius = ptrInt(*patch.CornerRadius)
+	}
+	if patch.FooterVisible != nil {
+		s.settings.FooterVisible = ptrBool(*patch.FooterVisible)
+	}
+	if patch.FooterText != nil {
+		text := strings.TrimSpace(*patch.FooterText)
+		if len([]rune(text)) > 80 || strings.ContainsAny(text, "\r\n\x00") {
+			return false, fmt.Errorf("底部栏文字最多 80 个字符，且不能包含换行")
+		}
+		s.settings.FooterText = ptrString(text)
+	}
+	if patch.FooterShowVersion != nil {
+		s.settings.FooterShowVersion = ptrBool(*patch.FooterShowVersion)
+	}
+	if patch.FooterShowGithub != nil {
+		s.settings.FooterShowGithub = ptrBool(*patch.FooterShowGithub)
 	}
 
 	if err := cfg.Save(); err != nil {

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="tabs-shell">
     <div class="tabs" role="tablist" :aria-label="ariaLabel" @keydown="onKeydown">
       <button
         v-for="tab in tabs"

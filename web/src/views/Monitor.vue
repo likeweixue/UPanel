@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-shell">
     <header class="page__header">
       <div>
         <div class="page__title-row">
@@ -205,6 +206,7 @@
         </UWidget>
       </div>
     </UTabs>
+    </div>
   </div>
 </template>
 

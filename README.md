@@ -47,6 +47,8 @@
 - 自研 BEM-ish 组件：`Button--icon`、`Dropdown--select`、`DashboardWidget`、`StatusDot`、Modal、Tabs、Toast 等；
 - a11y：`sr-only` 跳转链接、`aria-*`、键盘导航、焦点陷阱、`aria-live` 提示、减少动画偏好；
 - 浅色 / 深色 / 跟随系统主题，标准 / 紧凑密度，移动端适配。
+- 「设置 → 外观」支持界面圆角（默认 4px）、底部栏开关与文字/版本/GitHub 展示；底部栏自动贴底。
+- 侧边栏支持折叠为图标栏，底部「菜单设置」可调整菜单显示/隐藏与顺序（保存在当前浏览器）。
 
 ---
 
