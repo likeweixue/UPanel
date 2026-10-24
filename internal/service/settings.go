@@ -185,11 +185,26 @@ func (s *SettingsService) save() error {
 func (s *SettingsService) GetAll() *Settings {
 	cp := *s.settings
 	cp.RegistryMirrors = append([]string{}, s.settings.RegistryMirrors...)
-	cp.CornerRadius = ptrInt(*s.settings.CornerRadius)
-	cp.FooterVisible = ptrBool(*s.settings.FooterVisible)
-	cp.FooterText = ptrString(*s.settings.FooterText)
-	cp.FooterShowVersion = ptrBool(*s.settings.FooterShowVersion)
-	cp.FooterShowGithub = ptrBool(*s.settings.FooterShowGithub)
+	cp.CornerRadius = ptrInt(4)
+	if s.settings.CornerRadius != nil {
+		cp.CornerRadius = ptrInt(*s.settings.CornerRadius)
+	}
+	cp.FooterVisible = ptrBool(true)
+	if s.settings.FooterVisible != nil {
+		cp.FooterVisible = ptrBool(*s.settings.FooterVisible)
+	}
+	cp.FooterText = ptrString("")
+	if s.settings.FooterText != nil {
+		cp.FooterText = ptrString(*s.settings.FooterText)
+	}
+	cp.FooterShowVersion = ptrBool(true)
+	if s.settings.FooterShowVersion != nil {
+		cp.FooterShowVersion = ptrBool(*s.settings.FooterShowVersion)
+	}
+	cp.FooterShowGithub = ptrBool(true)
+	if s.settings.FooterShowGithub != nil {
+		cp.FooterShowGithub = ptrBool(*s.settings.FooterShowGithub)
+	}
 	return &cp
 }
 
