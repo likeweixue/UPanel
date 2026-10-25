@@ -12,7 +12,6 @@
 
     <section class="login__card" aria-labelledby="login-title">
       <div class="login__brand">
-        <ULogo size="lg" />
         <div>
           <p class="login__name">{{ panelName || 'UPanel' }}</p>
           <p class="login__tagline">轻量级 Linux 服务器管理面板</p>
@@ -30,13 +29,14 @@
       </div>
 
       <form class="login__form" novalidate @submit.prevent="submit">
-        <UField label="用户名" for-id="login-username" required>
+        <div class="login__field">
           <UInput
             id="login-username"
             v-model="username"
             :invalid="!!fieldErrors.username"
             autocomplete="username"
-            placeholder="admin"
+            placeholder="用户名"
+            aria-label="用户名"
             autofocus
             aria-describedby="login-username-error"
             @keyup.enter="submit"
@@ -44,9 +44,9 @@
           <p v-if="fieldErrors.username" id="login-username-error" class="field__error">
             {{ fieldErrors.username }}
           </p>
-        </UField>
+        </div>
 
-        <UField label="密码" for-id="login-password" required>
+        <div class="login__field">
           <UInput
             id="login-password"
             v-model="password"
@@ -55,10 +55,14 @@
             :invalid="!!fieldErrors.password"
             autocomplete="current-password"
             placeholder="请输入管理员密码"
+            aria-label="密码"
+            aria-describedby="login-password-error"
             @keyup.enter="submit"
           />
-          <p v-if="fieldErrors.password" class="field__error">{{ fieldErrors.password }}</p>
-        </UField>
+          <p v-if="fieldErrors.password" id="login-password-error" class="field__error">
+            {{ fieldErrors.password }}
+          </p>
+        </div>
 
         <UButton
           type="submit"
@@ -70,17 +74,7 @@
           label="登录"
         />
       </form>
-
-      <div class="login__note">
-        <UIcon name="shield" :size="14" />
-        <span>连续登录失败会触发临时锁定；请勿在公共网络保存密码。</span>
-      </div>
     </section>
-
-    <footer class="login__footer">
-      <span>{{ panelName || 'UPanel' }} <span v-if="version">· {{ version }}</span></span>
-      <span>Docker 容器化管理</span>
-    </footer>
   </main>
 </template>
 
@@ -88,8 +82,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UButton from '@/components/ui/UButton.vue'
-import ULogo from '@/components/ui/ULogo.vue'
-import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
 import { errText, panelApi } from '@/api'
@@ -107,7 +99,6 @@ const password = ref('')
 const loading = ref(false)
 const error = ref('')
 const panelName = ref('UPanel')
-const version = ref('')
 const fieldErrors = reactive({ username: '', password: '' })
 
 const isDark = computed(() => isDarkTheme(themeState.effective))
@@ -116,7 +107,6 @@ onMounted(async () => {
   try {
     const info = await panelApi.info()
     panelName.value = info.name || 'UPanel'
-    version.value = info.version || ''
   } catch (e) {
     /* 面板信息不可用时保持默认 */
   }
@@ -218,28 +208,57 @@ async function submit() {
   margin-top: 16px;
 }
 
-.login__note {
+.login__field {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 6px;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-subtle);
-  font-size: var(--text-sm);
-  line-height: 1.5;
 }
 
-.login__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  max-width: 400px;
-  margin-top: 18px;
+.login__field :deep(.input),
+.login__field :deep(.input-affix .input) {
+  height: 48px;
+  padding: 0 14px;
+  border-color: transparent;
+  background: var(--color-surface-3);
+  font-size: var(--text-base);
+  transition: background var(--transition), color var(--transition);
+}
+
+.login__field :deep(.input::placeholder) {
   color: var(--color-text-subtle);
-  font-size: var(--text-sm);
+}
+
+.login__field :deep(.input:hover) {
+  border-color: transparent;
+  background: var(--color-surface-2);
+}
+
+.login__field :deep(.input:focus) {
+  border-color: transparent;
+  background: var(--color-primary-soft);
+  box-shadow: none;
+}
+
+.login__field :deep(.input[aria-invalid="true"]) {
+  border-color: transparent;
+  background: var(--color-danger-soft);
+}
+
+.login__field :deep(.input-affix) {
+  border-radius: var(--radius-sm);
+}
+
+.login__field :deep(.input-affix .input) {
+  padding-right: 46px;
+}
+
+.login__field :deep(.input-affix__btn) {
+  right: 7px;
+}
+
+.login__field :deep(.input:-webkit-autofill) {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface-3) inset;
+  -webkit-text-fill-color: var(--color-text);
 }
 
 @media (max-width: 480px) {
@@ -249,12 +268,6 @@ async function submit() {
 
   .login__card {
     padding: 22px 18px;
-  }
-
-  .login__footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
   }
 }
 </style>
