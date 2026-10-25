@@ -12,15 +12,11 @@
 
     <section class="login__card" aria-labelledby="login-title">
       <div class="login__brand">
-        <div>
-          <p class="login__name">{{ panelName || 'UPanel' }}</p>
-          <p class="login__tagline">轻量级 Linux 服务器管理面板</p>
-        </div>
+        <p class="login__name">{{ panelName || 'UPanel' }}</p>
       </div>
 
       <div class="login__heading">
-        <h1 id="login-title" class="login__title">登录管理面板</h1>
-        <p class="login__subtitle">使用管理员账号继续</p>
+        <h1 id="login-title" class="login__title">登录</h1>
       </div>
 
       <div v-if="error" class="alert alert--danger" role="alert">
@@ -169,9 +165,8 @@ async function submit() {
 .login__brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--color-border);
+  justify-content: center;
+  text-align: center;
 }
 
 .login__name {
@@ -180,25 +175,15 @@ async function submit() {
   letter-spacing: -0.01em;
 }
 
-.login__tagline {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
 .login__heading {
-  margin: 22px 0 18px;
+  margin: 10px 0 22px;
+  text-align: center;
 }
 
 .login__title {
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 650;
   letter-spacing: -0.02em;
-}
-
-.login__subtitle {
-  margin-top: 4px;
-  color: var(--color-text-muted);
-  font-size: var(--text-md);
 }
 
 .login__form {
