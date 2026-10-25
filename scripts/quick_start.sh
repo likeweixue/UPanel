@@ -5,12 +5,12 @@
 #  用法:
 #    bash -c "$(curl -sSL https://你的域名/upanel/quick_start.sh)"
 #  可通过环境变量覆盖下载地址:
-#    UPANEL_PKG_URL=https://xxx/upanel-v0.1.7-linux-amd64.tar.gz
+#    UPANEL_PKG_URL=https://xxx/upanel-v0.1.8-linux-amd64.tar.gz
 # ============================================================================
 
 set -e
 
-PKG_URL="${UPANEL_PKG_URL:-https://github.com/likeweixue/UPanel/releases/latest/download/upanel-v0.1.7-linux-amd64.tar.gz}"
+PKG_URL="${UPANEL_PKG_URL:-https://github.com/likeweixue/UPanel/releases/latest/download/upanel-v0.1.8-linux-amd64.tar.gz}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

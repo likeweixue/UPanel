@@ -13,7 +13,7 @@ import (
 )
 
 // Version 与面板主程序保持一致
-var Version = "v0.1.7"
+var Version = "v0.1.8"
 
 const serviceName = "upanel"
 
