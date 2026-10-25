@@ -129,7 +129,7 @@
     </div>
 
     <!-- 新建/编辑 -->
-    <UModal
+    <UDrawer
       v-model="formOpen"
       :title="editingId ? '编辑计划任务' : '新建计划任务'"
       size="lg"
@@ -177,7 +177,7 @@
         <UButton variant="secondary" @click="formOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" icon="save" :label="editingId ? '保存' : '创建任务'" @click="submitForm" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 输出 -->
     <UModal v-model="outputOpen" :title="`${outputJob?.name || ''} · 上次输出`" size="xl">
@@ -212,6 +212,7 @@ import UEmpty from '@/components/ui/UEmpty.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import USwitch from '@/components/ui/USwitch.vue'

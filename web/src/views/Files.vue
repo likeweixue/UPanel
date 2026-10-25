@@ -53,8 +53,6 @@
       </div>
     </div>
 
-    <input ref="uploadInput" type="file" class="sr-only" aria-hidden="true" tabindex="-1" @change="onUpload" />
-
     <div v-if="loading" class="loading-block"><span class="spinner" /> 正在读取目录…</div>
 
     <div v-else-if="filteredEntries.length === 0" class="table-wrap">
@@ -150,8 +148,53 @@
       </div>
     </div>
 
+    <!-- 上传 -->
+    <UDrawer
+      v-model="uploadOpen"
+      title="上传文件"
+      :description="`目标目录：${currentAbs || '/'}`"
+      size="sm"
+      :busy="uploading"
+      @close="resetUpload"
+    >
+      <div class="stack">
+        <label
+          class="upload-drop"
+          @dragover.prevent
+          @drop.prevent="onDropUpload"
+        >
+          <UIcon name="upload" :size="24" />
+          <strong>{{ uploadTarget ? uploadTarget.name : '点击选择，或拖拽文件到这里' }}</strong>
+          <span v-if="uploadTarget" class="subtle">
+            {{ formatBytes(uploadTarget.size) }}
+          </span>
+          <span v-else class="field__hint">单个文件最大 2GB</span>
+          <input
+            ref="uploadInput"
+            type="file"
+            class="sr-only"
+            tabindex="-1"
+            @change="onPickUpload"
+          />
+        </label>
+        <p v-if="uploadError" class="field__error" role="alert">{{ uploadError }}</p>
+        <p class="field__hint">上传会以面板进程权限写入当前目录，请确认目标路径。</p>
+      </div>
+      <template #footer>
+        <UButton variant="secondary" :disabled="uploading" @click="closeUpload">取消</UButton>
+        <UButton
+          variant="primary"
+          icon="upload"
+          label="开始上传"
+          :loading="uploading"
+          :disabled="!uploadTarget"
+          @click="submitUpload"
+        />
+      </template>
+    </UDrawer>
+
     <!-- 新建 -->
-    <UModal v-model="createOpen" :title="createType === 'folder' ? '新建文件夹' : '新建文件'" size="sm" :busy="submitting">
+    <UDrawer v-model="createOpen" :title="createType === 'folder' ? '新建文件夹' : '新建文件'" size="sm" :busy="submitting">
       <form id="create-entry-form" @submit.prevent="submitCreate">
         <UField :label="createType === 'folder' ? '文件夹名称' : '文件名'" for-id="entry-name" required>
           <UInput id="entry-name" v-model="createName"
@@ -163,10 +206,10 @@
         <UButton variant="secondary" @click="createOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" label="创建" @click="submitCreate" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 重命名 -->
-    <UModal v-model="renameOpen" title="重命名" size="sm" :busy="submitting">
+    <UDrawer v-model="renameOpen" title="重命名" size="sm" :busy="submitting">
       <form id="rename-form" @submit.prevent="submitRename">
         <UField label="新名称" for-id="rename-name" required>
           <UInput id="rename-name" v-model="renameName" autocomplete="off" @keyup.enter="submitRename" />
@@ -177,7 +220,7 @@
         <UButton variant="secondary" @click="renameOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" label="保存" @click="submitRename" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 删除 -->
     <UModal v-model="deleteOpen" title="删除确认" size="sm" :busy="submitting">
@@ -197,7 +240,7 @@
     </UModal>
 
     <!-- 编辑器 -->
-    <UModal v-model="editorOpen" :title="editorEntry?.name || '编辑文件'" size="xl" :busy="submitting">
+    <UDrawer v-model="editorOpen" :title="editorEntry?.name || '编辑文件'" size="xl" :busy="submitting">
       <div class="stack">
         <p class="subtle mono" style="font-size: 11px">{{ editorEntry?.path }}</p>
         <div v-if="editorLoading" class="loading-block"><span class="spinner" /> 正在读取文件…</div>
@@ -219,7 +262,7 @@
         <UButton variant="secondary" @click="editorOpen = false">关闭</UButton>
         <UButton variant="primary" :loading="submitting" icon="save" label="保存文件" @click="submitEditor" />
       </template>
-    </UModal>
+    </UDrawer>
   </div>
 </template>
 
@@ -231,6 +274,7 @@ import UEmpty from '@/components/ui/UEmpty.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UTextarea from '@/components/ui/UTextarea.vue'
 import { errText, fileApi } from '@/api'
@@ -248,6 +292,10 @@ const loading = ref(false)
 const error = ref('')
 const search = ref('')
 const uploadInput = ref(null)
+const uploadOpen = ref(false)
+const uploadTarget = ref(null)
+const uploadError = ref('')
+const uploading = ref(false)
 
 const breadcrumbs = computed(() => {
   const parts = currentPath.value.split('/').filter(Boolean)
@@ -318,21 +366,55 @@ async function downloadEntry(entry) {
 }
 
 function triggerUpload() {
-  uploadInput.value?.click()
+  uploadOpen.value = true
+  uploadTarget.value = null
+  uploadError.value = ''
 }
 
-async function onUpload(event) {
-  const file = event.target.files && event.target.files[0]
+function resetUpload() {
+  uploadTarget.value = null
+  uploadError.value = ''
+}
+
+function closeUpload() {
+  if (uploading.value) return
+  uploadOpen.value = false
+  resetUpload()
+  clearActionQuery()
+}
+
+function setUploadFile(file) {
   if (!file) return
+  uploadTarget.value = file
+  uploadError.value = ''
+}
+
+function onPickUpload(event) {
+  const file = event.target.files && event.target.files[0]
+  setUploadFile(file)
+  event.target.value = ''
+}
+
+function onDropUpload(event) {
+  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]
+  setUploadFile(file)
+}
+
+async function submitUpload() {
+  if (uploading.value || !uploadTarget.value) return
+  uploading.value = true
+  uploadError.value = ''
   try {
-    await fileApi.upload(currentPath.value, file)
-    toastSuccess('上传成功', file.name)
+    await fileApi.upload(currentPath.value, uploadTarget.value)
+    toastSuccess('上传成功', uploadTarget.value.name)
+    uploadOpen.value = false
+    resetUpload()
+    clearActionQuery()
     await loadPath(currentPath.value)
   } catch (e) {
-    toastError('上传失败', errText(e))
+    uploadError.value = errText(e, '上传失败')
   } finally {
-    event.target.value = ''
-    clearActionQuery()
+    uploading.value = false
   }
 }
 

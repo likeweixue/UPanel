@@ -41,11 +41,16 @@
   --radius: var(--radius-ui);
   --radius-lg: calc(var(--radius-ui) * 2);
   --radius-pill: 999px;
+  --logo-from: #2f6fed;
+  --logo-to: #a855f7;
+  --logo-text: #ffffff;
+  --logo-shadow: rgba(76, 66, 220, 0.26);
 
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-pop: 0 16px 40px rgba(16, 24, 40, 0.16), 0 2px 8px rgba(16, 24, 40, 0.06);
 
   --header-h: 56px;
+  --footer-h: 42px;
   --drawer-w: 248px;
   --content-max: 1280px;
 
@@ -104,4 +109,156 @@ html[data-theme="dark"] {
 html[data-density="compact"] {
   --control-h: 30px;
   --control-h-sm: 26px;
+}
+
+/* ---------- 复古黄 · 护眼 ---------- */
+html[data-theme="retro-yellow"] {
+  color-scheme: light;
+  --logo-from: #8a5a22;
+  --logo-to: #d8a24a;
+  --logo-shadow: rgba(138, 90, 34, 0.28);
+  --color-bg: #f1e7d3;
+  --color-bg-soft: #f7efe0;
+  --color-surface: #fbf6ec;
+  --color-surface-2: #f5ecdc;
+  --color-surface-3: #eee1cb;
+  --color-border: #ddccb0;
+  --color-border-strong: #c8b28e;
+  --color-text: #3c3325;
+  --color-text-muted: #635640;
+  --color-text-subtle: #89785c;
+  --color-text-inverse: #fffdf8;
+  --color-primary: #9a6428;
+  --color-primary-hover: #81521d;
+  --color-primary-active: #6b4315;
+  --color-primary-soft: #f3e1c2;
+  --color-primary-border: #e0c193;
+  --color-success: #56763d;
+  --color-success-soft: #e8efd8;
+  --color-warning: #a26a1f;
+  --color-warning-soft: #f8e9c9;
+  --color-danger: #b34a3b;
+  --color-danger-hover: #963b2e;
+  --color-danger-soft: #f8e2dc;
+  --color-info: #5d7481;
+  --color-info-soft: #e6eef0;
+  --color-overlay: rgba(60, 45, 20, 0.38);
+  --shadow-card: 0 1px 2px rgba(90, 65, 20, 0.08);
+  --shadow-pop: 0 16px 40px rgba(80, 55, 20, 0.18), 0 2px 8px rgba(80, 55, 20, 0.08);
+}
+
+/* ---------- 绿色护眼纸 ---------- */
+html[data-theme="green-paper"] {
+  color-scheme: light;
+  --logo-from: #33683f;
+  --logo-to: #7fb06a;
+  --logo-shadow: rgba(63, 122, 76, 0.28);
+  --color-bg: #e6efe2;
+  --color-bg-soft: #eef5ea;
+  --color-surface: #f7faf4;
+  --color-surface-2: #eff5eb;
+  --color-surface-3: #e3ecdd;
+  --color-border: #cfddc8;
+  --color-border-strong: #b6c9ac;
+  --color-text: #2f3c2c;
+  --color-text-muted: #50634a;
+  --color-text-subtle: #74836c;
+  --color-text-inverse: #ffffff;
+  --color-primary: #3f7a4c;
+  --color-primary-hover: #33683f;
+  --color-primary-active: #295734;
+  --color-primary-soft: #e0efdd;
+  --color-primary-border: #b7d3ae;
+  --color-success: #3f7a4c;
+  --color-success-soft: #e2f0de;
+  --color-warning: #916329;
+  --color-warning-soft: #f4e9d3;
+  --color-danger: #a94a3e;
+  --color-danger-hover: #8d3b31;
+  --color-danger-soft: #f5e1dd;
+  --color-info: #4b7480;
+  --color-info-soft: #e2eef0;
+  --color-overlay: rgba(30, 55, 30, 0.32);
+  --shadow-card: 0 1px 2px rgba(35, 65, 35, 0.07);
+  --shadow-pop: 0 16px 40px rgba(30, 55, 30, 0.16), 0 2px 8px rgba(30, 55, 30, 0.07);
+}
+
+/* ---------- 黑金 ---------- */
+html[data-theme="black-gold"] {
+  color-scheme: dark;
+  --logo-from: #8f741d;
+  --logo-to: #d4af37;
+  --logo-text: #17100b;
+  --logo-shadow: rgba(212, 175, 55, 0.3);
+  --color-bg: #090806;
+  --color-bg-soft: #0e0c09;
+  --color-surface: #12100c;
+  --color-surface-2: #18150f;
+  --color-surface-3: #221d14;
+  --color-border: #30291d;
+  --color-border-strong: #4b3f2b;
+  --color-text: #f1e7d2;
+  --color-text-muted: #c0b49b;
+  --color-text-subtle: #8e8168;
+  --color-text-inverse: #0b0a08;
+  --color-primary: #d4af37;
+  --color-primary-hover: #e6c45c;
+  --color-primary-active: #b8952a;
+  --color-primary-soft: rgba(212, 175, 55, 0.13);
+  --color-primary-border: rgba(212, 175, 55, 0.38);
+  --color-success: #74c58c;
+  --color-success-soft: rgba(116, 197, 140, 0.14);
+  --color-warning: #dfa940;
+  --color-warning-soft: rgba(223, 169, 64, 0.14);
+  --color-danger: #e06c5a;
+  --color-danger-hover: #ef8878;
+  --color-danger-soft: rgba(224, 108, 90, 0.14);
+  --color-info: #7fb6cb;
+  --color-info-soft: rgba(127, 182, 203, 0.14);
+  --color-overlay: rgba(0, 0, 0, 0.68);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 20px 48px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- 暗夜橙红 ---------- */
+html[data-theme="ember"] {
+  color-scheme: dark;
+  --logo-from: #b33a17;
+  --logo-to: #ff6b3d;
+  --logo-text: #17100b;
+  --logo-shadow: rgba(255, 107, 61, 0.3);
+  --color-bg: #100b0a;
+  --color-bg-soft: #160e0c;
+  --color-surface: #1c1311;
+  --color-surface-2: #241816;
+  --color-surface-3: #2f201c;
+  --color-border: #3e2a25;
+  --color-border-strong: #5b3d35;
+  --color-text: #f5e8e3;
+  --color-text-muted: #c9ada4;
+  --color-text-subtle: #9a7c73;
+  --color-text-inverse: #140b09;
+  --color-primary: #ff6b3d;
+  --color-primary-hover: #ff835c;
+  --color-primary-active: #e95a2e;
+  --color-primary-soft: rgba(255, 107, 61, 0.14);
+  --color-primary-border: rgba(255, 107, 61, 0.4);
+  --color-success: #6fcf91;
+  --color-success-soft: rgba(111, 207, 145, 0.14);
+  --color-warning: #f0a35e;
+  --color-warning-soft: rgba(240, 163, 94, 0.14);
+  --color-danger: #ff5b5b;
+  --color-danger-hover: #ff7a7a;
+  --color-danger-soft: rgba(255, 91, 91, 0.14);
+  --color-info: #6fb5d1;
+  --color-info-soft: rgba(111, 181, 209, 0.14);
+  --color-overlay: rgba(0, 0, 0, 0.66);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 20px 48px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* 金色和橙红主色上使用深色按钮文字，保证对比度 */
+html[data-theme="black-gold"] .btn--primary,
+html[data-theme="ember"] .btn--primary {
+  --btn-color: #17100b;
 }

@@ -210,7 +210,7 @@
     </div>
 
     <!-- 修改密码 -->
-    <UModal v-model="passwordOpen" title="修改管理员密码" description="修改成功后所有已登录会话会立即失效" size="md" :busy="passwordSubmitting">
+    <UDrawer v-model="passwordOpen" title="修改管理员密码" description="修改成功后所有已登录会话会立即失效" size="md" :busy="passwordSubmitting">
       <form id="password-form" class="stack" @submit.prevent="submitPassword">
         <div v-if="passwordError" class="alert alert--danger" role="alert">
           <UIcon name="alert" :size="16" class="alert__icon" />
@@ -234,7 +234,7 @@
         <UButton variant="secondary" @click="passwordOpen = false">取消</UButton>
         <UButton variant="primary" :loading="passwordSubmitting" icon="key" label="修改密码" @click="submitPassword" />
       </template>
-    </UModal>
+    </UDrawer>
   </div>
 </template>
 
@@ -246,7 +246,7 @@ import UEmpty from '@/components/ui/UEmpty.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
-import UModal from '@/components/ui/UModal.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import UTabs from '@/components/ui/UTabs.vue'
 import UWidget from '@/components/ui/UWidget.vue'

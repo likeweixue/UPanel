@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed && !isMobile }">
+  <div class="app-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed && !isMobile, 'has-fixed-footer': footer.visible }">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
     <header class="app-header">
@@ -15,7 +15,7 @@
       />
 
       <router-link to="/dashboard" class="app-header__brand" aria-label="UPanel 管理后台，返回总览">
-        <span class="app-header__mark" aria-hidden="true"><UIcon name="zap" :size="16" /></span>
+        <ULogo size="sm" />
         <span class="app-header__wordmark">
           UPanel <span class="app-header__wordmark-muted">Admin</span>
         </span>
@@ -285,12 +285,13 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminNavDropdown from '@/components/AdminNavDropdown.vue'
 import UButton from '@/components/ui/UButton.vue'
 import UIcon from '@/components/ui/UIcon.vue'
+import ULogo from '@/components/ui/ULogo.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import USwitch from '@/components/ui/USwitch.vue'
 import { gatewayApi, panelApi, settingsApi } from '@/api'
 import { authState, useAuth } from '@/composables/useAuth'
-import { setCornerRadius, toggleTheme, useTheme } from '@/composables/useTheme'
+import { isDarkTheme, setCornerRadius, toggleTheme, useTheme } from '@/composables/useTheme'
 import { navCount, navItems, primaryNav, secondaryNav } from '@/nav/catalog'
 
 const route = useRoute()
@@ -346,11 +347,7 @@ const currentNavItem = computed(() => {
 const currentTitle = computed(
   () => (currentNavItem.value && currentNavItem.value.label) || (route.meta && route.meta.title) || '总览'
 )
-const isDark = computed(
-  () =>
-    themeState.mode === 'dark' ||
-    (themeState.mode === 'system' && themeState.systemDark)
-)
+const isDark = computed(() => isDarkTheme(themeState.effective))
 const gatewayLabel = computed(() => {
   if (gatewayStatus.value === 'running') return `运行中${gatewayPort.value ? `，端口 ${gatewayPort.value}` : ''}`
   if (gatewayStatus.value === 'docker_unavailable') return 'Docker 未连接'

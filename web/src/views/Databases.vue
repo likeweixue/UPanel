@@ -195,7 +195,7 @@
     </div>
 
     <!-- 创建 -->
-    <UModal v-model="createOpen" title="创建数据库" description="容器创建完成后会自动生成随机凭据（可自定义）" size="lg" :busy="submitting" @close="clearCreateQuery">
+    <UDrawer v-model="createOpen" title="创建数据库" description="容器创建完成后会自动生成随机凭据（可自定义）" size="lg" :busy="submitting" @close="clearCreateQuery">
       <form id="create-db-form" class="stack" @submit.prevent="submitCreate">
         <div v-if="formError" class="alert alert--danger" role="alert">
           <UIcon name="alert" :size="16" class="alert__icon" />
@@ -237,7 +237,7 @@
         <UButton variant="secondary" @click="createOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" icon="plus" label="创建并启动" @click="submitCreate" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 连接信息 -->
     <UModal v-model="connectionOpen" :title="`${connectionDb?.name || ''} · 连接信息`" size="lg">
@@ -324,6 +324,7 @@ import UEmpty from '@/components/ui/UEmpty.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import USwitch from '@/components/ui/USwitch.vue'

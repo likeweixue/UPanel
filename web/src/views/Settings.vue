@@ -264,9 +264,9 @@
 
       <!-- 外观 -->
       <div v-else-if="activeTab === 'appearance'" class="widget-grid">
-        <UWidget title="主题" subtitle="立即生效，保存在浏览器" icon="sun" :span="6">
+        <UWidget title="主题" subtitle="立即生效，保存在浏览器" icon="sun" :span="12">
           <div class="stack">
-            <div class="type-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+            <div class="type-grid theme-grid">
               <button
                 v-for="option in themeOptions"
                 :key="option.value"
@@ -275,6 +275,10 @@
                 :aria-pressed="themeState.mode === option.value ? 'true' : 'false'"
                 @click="chooseTheme(option.value)"
               >
+                <span class="theme-swatch" aria-hidden="true">
+                  <i :style="{ background: option.swatch[0] }" />
+                  <i :style="{ background: option.swatch[1] }" />
+                </span>
                 <span class="type-card__title"><UIcon :name="option.icon" :size="15" /> {{ option.label }}</span>
                 <span class="type-card__desc">{{ option.desc }}</span>
               </button>
@@ -327,29 +331,6 @@
               </button>
             </div>
             <p class="field__hint">同时影响卡片、按钮、输入框、标签页和弹窗，保存后同步到服务器。</p>
-          </div>
-        </UWidget>
-
-        <UWidget title="预览" subtitle="组件样式示例" icon="grid" :span="6">
-          <div class="stack">
-            <div class="row">
-              <UButton variant="primary" icon="plus" label="主按钮" />
-              <UButton variant="secondary" icon="refresh" label="次按钮" />
-              <UButton variant="danger-soft" icon="trash" label="危险按钮" />
-            </div>
-            <div class="row">
-              <UStatusDot status="running" text="运行中" />
-              <UStatusDot status="stopped" text="已停止" />
-              <UStatusDot status="error" text="异常" />
-            </div>
-            <div class="meter">
-              <div class="meter__head"><span class="meter__label">资源使用</span><span class="meter__value">62%</span></div>
-              <div class="meter__track"><div class="meter__fill" style="width: 62%" /></div>
-            </div>
-            <div class="alert alert--info">
-              <UIcon name="info" :size="16" class="alert__icon" />
-              <div class="alert__body">这是信息提示样式</div>
-            </div>
           </div>
         </UWidget>
 
@@ -542,9 +523,13 @@ const logDriverOptions = [
 ]
 
 const themeOptions = [
-  { value: 'light', label: '浅色', icon: 'sun', desc: '默认的扁平浅色界面' },
-  { value: 'dark', label: '深色', icon: 'moon', desc: '低亮度环境更舒适' },
-  { value: 'system', label: '跟随系统', icon: 'settings-2', desc: '自动匹配系统主题' },
+  { value: 'light', label: '浅色', icon: 'sun', desc: '默认的扁平浅色界面', swatch: ['#ffffff', '#2f6fed'] },
+  { value: 'retro-yellow', label: '复古黄', icon: 'sun', desc: '暖黄纸张，护眼', swatch: ['#fbf6ec', '#9a6428'] },
+  { value: 'green-paper', label: '护眼纸', icon: 'sun', desc: '绿色纸张，低刺激', swatch: ['#f7faf4', '#3f7a4c'] },
+  { value: 'dark', label: '深色', icon: 'moon', desc: '低亮度环境更舒适', swatch: ['#171a21', '#5b8cff'] },
+  { value: 'black-gold', label: '黑金', icon: 'moon', desc: '黑底金色，沉稳', swatch: ['#12100c', '#d4af37'] },
+  { value: 'ember', label: '暗夜橙红', icon: 'moon', desc: '暗色背景，橙红提示', swatch: ['#1c1311', '#ff6b3d'] },
+  { value: 'system', label: '跟随系统', icon: 'settings-2', desc: '自动匹配系统主题', swatch: ['#ffffff', '#171a21'] },
 ]
 const densityOptions = [
   { value: 'comfortable', label: '标准密度' },
@@ -570,8 +555,8 @@ function applySettings(data) {
   settings.gatewayHttpsPort = String(data.gatewayHttpsPort || '443')
   settings.registryMirrors = data.registryMirrors || []
   mirrorsText.value = settings.registryMirrors.join('\n')
-  settings.theme = data.theme || 'light'
-  settings.density = data.density || 'comfortable'
+  settings.theme = themeState.mode
+  settings.density = themeState.density
   settings.cornerRadius = Number.isFinite(Number(data.cornerRadius)) ? Number(data.cornerRadius) : 4
   setCornerRadius(settings.cornerRadius)
   settings.footerVisible = data.footerVisible !== false
@@ -764,7 +749,8 @@ async function changePassword() {
 function chooseTheme(mode) {
   setTheme(mode)
   settings.theme = mode
-  toastSuccess('主题已切换', mode === 'system' ? '跟随系统' : mode === 'dark' ? '深色' : '浅色')
+  const option = themeOptions.find((item) => item.value === mode)
+  toastSuccess('主题已切换', option ? option.label : mode)
 }
 
 function chooseDensity(density) {

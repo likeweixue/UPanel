@@ -176,7 +176,7 @@
     </div>
 
     <!-- 安装 -->
-    <UModal
+    <UDrawer
       v-model="installOpen"
       :title="`安装 ${installApp?.name || ''}`"
       description="安装过程会拉取镜像，首次安装可能需要几分钟"
@@ -251,7 +251,7 @@
         <UButton variant="secondary" :disabled="installing" @click="closeInstall">取消</UButton>
         <UButton variant="primary" :loading="installing" icon="plus" label="开始安装" @click="submitInstall" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 凭据 -->
     <UModal v-model="credentialsOpen" :title="`${credentialsName} · 连接凭据`" size="md">
@@ -314,6 +314,7 @@ import UEmpty from '@/components/ui/UEmpty.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import USwitch from '@/components/ui/USwitch.vue'

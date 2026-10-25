@@ -12,7 +12,7 @@
 
     <section class="login__card" aria-labelledby="login-title">
       <div class="login__brand">
-        <span class="login__mark" aria-hidden="true"><UIcon name="zap" :size="22" /></span>
+        <ULogo size="lg" />
         <div>
           <p class="login__name">{{ panelName || 'UPanel' }}</p>
           <p class="login__tagline">轻量级 Linux 服务器管理面板</p>
@@ -88,12 +88,13 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UButton from '@/components/ui/UButton.vue'
+import ULogo from '@/components/ui/ULogo.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
 import { errText, panelApi } from '@/api'
 import { useAuth } from '@/composables/useAuth'
-import { toggleTheme, useTheme } from '@/composables/useTheme'
+import { isDarkTheme, toggleTheme, useTheme } from '@/composables/useTheme'
 import { toastSuccess } from '@/composables/useToast'
 
 const route = useRoute()
@@ -109,9 +110,7 @@ const panelName = ref('UPanel')
 const version = ref('')
 const fieldErrors = reactive({ username: '', password: '' })
 
-const isDark = computed(
-  () => themeState.mode === 'dark' || (themeState.mode === 'system' && themeState.systemDark)
-)
+const isDark = computed(() => isDarkTheme(themeState.effective))
 
 onMounted(async () => {
   try {
@@ -183,18 +182,6 @@ async function submit() {
   gap: 11px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--color-border);
-}
-
-.login__mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: #fff;
-  flex: 0 0 auto;
 }
 
 .login__name {

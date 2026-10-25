@@ -374,8 +374,12 @@ func (s *SettingsService) Update(patch *Settings) (bool, error) {
 	if patch.Language != "" && patch.Language != "zh-CN" && patch.Language != "en-US" {
 		return false, fmt.Errorf("不支持的语言: %s", patch.Language)
 	}
-	if patch.Theme != "" && patch.Theme != "light" && patch.Theme != "dark" && patch.Theme != "system" {
-		return false, fmt.Errorf("不支持的主题: %s", patch.Theme)
+	if patch.Theme != "" {
+		switch patch.Theme {
+		case "light", "dark", "system", "retro-yellow", "green-paper", "black-gold", "ember":
+		default:
+			return false, fmt.Errorf("不支持的主题: %s", patch.Theme)
+		}
 	}
 	if patch.Density != "" && patch.Density != "comfortable" && patch.Density != "compact" {
 		return false, fmt.Errorf("不支持的密度: %s", patch.Density)
@@ -500,6 +504,11 @@ func restartGateway(cfg *config.Config) error {
 
 // SetTheme 更新主题
 func (s *SettingsService) SetTheme(theme string) error {
+	switch theme {
+	case "light", "dark", "system", "retro-yellow", "green-paper", "black-gold", "ember":
+	default:
+		return fmt.Errorf("不支持的主题: %s", theme)
+	}
 	settingsMu.Lock()
 	defer settingsMu.Unlock()
 	s.settings.Theme = theme

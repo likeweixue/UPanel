@@ -371,7 +371,7 @@
     </div>
 
     <!-- 创建网站 -->
-    <UModal v-model="createOpen" title="创建网站" description="站点创建后会自动生成默认首页并接入网关" size="lg" :busy="submitting" @close="clearActionQuery">
+    <UDrawer v-model="createOpen" title="创建网站" description="站点创建后会自动生成默认首页并接入网关" size="lg" :busy="submitting" @close="clearActionQuery">
       <form id="create-site-form" class="stack" @submit.prevent="submitCreate">
         <div v-if="formError" class="alert alert--danger" role="alert">
           <UIcon name="alert" :size="16" class="alert__icon" />
@@ -445,10 +445,10 @@
         <UButton variant="secondary" @click="createOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" icon="plus" label="创建网站" @click="submitCreate" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 编辑网站 -->
-    <UModal v-model="editOpen" :title="`编辑 ${editSite?.domain || ''}`" description="修改别名、备注与运行时参数" size="lg" :busy="submitting">
+    <UDrawer v-model="editOpen" :title="`编辑 ${editSite?.domain || ''}`" description="修改别名、备注与运行时参数" size="lg" :busy="submitting">
       <form id="edit-site-form" class="stack" @submit.prevent="submitEdit">
         <div v-if="formError" class="alert alert--danger" role="alert">
           <UIcon name="alert" :size="16" class="alert__icon" />
@@ -477,10 +477,10 @@
         <UButton variant="secondary" @click="editOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" label="保存修改" @click="submitEdit" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- SSL -->
-    <UModal v-model="sslOpen" :title="`${sslSite?.domain || ''} · SSL 证书`" size="lg" :busy="submitting">
+    <UDrawer v-model="sslOpen" :title="`${sslSite?.domain || ''} · SSL 证书`" size="lg" :busy="submitting">
       <form id="ssl-form" class="stack" @submit.prevent="submitSSL">
         <div v-if="formError" class="alert alert--danger" role="alert">
           <UIcon name="alert" :size="16" class="alert__icon" />
@@ -498,7 +498,7 @@
         <UButton variant="secondary" @click="sslOpen = false">取消</UButton>
         <UButton variant="primary" :loading="submitting" icon="ssl" label="部署证书" @click="submitSSL" />
       </template>
-    </UModal>
+    </UDrawer>
 
     <!-- 删除网站 -->
     <UModal v-model="deleteOpen" title="删除网站" size="sm" :busy="submitting">
@@ -532,6 +532,7 @@ import UDropdownSelect from '@/components/ui/UDropdownSelect.vue'
 import UField from '@/components/ui/UField.vue'
 import UIcon from '@/components/ui/UIcon.vue'
 import UInput from '@/components/ui/UInput.vue'
+import UDrawer from '@/components/ui/UDrawer.vue'
 import UModal from '@/components/ui/UModal.vue'
 import UStatusDot from '@/components/ui/UStatusDot.vue'
 import UTabs from '@/components/ui/UTabs.vue'

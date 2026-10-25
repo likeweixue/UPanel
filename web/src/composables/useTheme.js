@@ -4,29 +4,61 @@ const THEME_KEY = 'upanel_theme'
 const DENSITY_KEY = 'upanel_density'
 const RADIUS_KEY = 'upanel_radius'
 
+export const LIGHT_THEMES = ['light', 'retro-yellow', 'green-paper']
+export const DARK_THEMES = ['dark', 'black-gold', 'ember']
+export const THEMES = [...LIGHT_THEMES, ...DARK_THEMES, 'system']
+
+const THEME_COLORS = {
+  light: '#ffffff',
+  'retro-yellow': '#fbf6ec',
+  'green-paper': '#f2f7ef',
+  dark: '#171a21',
+  'black-gold': '#11100d',
+  ember: '#1c1412',
+}
+
 const media = typeof window !== 'undefined' && window.matchMedia
   ? window.matchMedia('(prefers-color-scheme: dark)')
   : null
 
+function normalizeTheme(mode) {
+  return THEMES.includes(mode) ? mode : 'light'
+}
+
+export function isDarkTheme(theme) {
+  return DARK_THEMES.includes(theme)
+}
+
+export function resolveTheme(mode, systemDark) {
+  if (mode === 'system') return systemDark ? 'dark' : 'light'
+  return normalizeTheme(mode)
+}
+
+const savedMode = typeof window !== 'undefined' ? normalizeTheme(localStorage.getItem(THEME_KEY)) : 'light'
+const systemDark = media ? media.matches : false
+
 export const themeState = reactive({
-  mode: localStorage.getItem(THEME_KEY) || 'light',
+  mode: savedMode,
+  effective: resolveTheme(savedMode, systemDark),
   density: localStorage.getItem(DENSITY_KEY) || 'comfortable',
-  systemDark: media ? media.matches : false,
+  systemDark,
   cornerRadius: Math.min(16, Math.max(0, Number(localStorage.getItem(RADIUS_KEY) ?? 4) || 0)),
 })
 
 function apply() {
-  const effective =
-    themeState.mode === 'system' ? (themeState.systemDark ? 'dark' : 'light') : themeState.mode
-  document.documentElement.setAttribute('data-theme', effective === 'dark' ? 'dark' : 'light')
-  document.documentElement.setAttribute('data-density', themeState.density)
-  document.documentElement.style.setProperty('--radius-ui', `${themeState.cornerRadius}px`)
+  const effective = resolveTheme(themeState.mode, themeState.systemDark)
+  themeState.effective = effective
+  const root = document.documentElement
+  root.setAttribute('data-theme', effective)
+  root.setAttribute('data-density', themeState.density)
+  root.style.colorScheme = isDarkTheme(effective) ? 'dark' : 'light'
+  root.style.setProperty('--radius-ui', `${themeState.cornerRadius}px`)
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', effective === 'dark' ? '#171a21' : '#ffffff')
+  if (meta) meta.setAttribute('content', THEME_COLORS[effective] || THEME_COLORS.light)
 }
 
 export function setTheme(mode) {
-  themeState.mode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light'
+  themeState.mode = normalizeTheme(mode)
   localStorage.setItem(THEME_KEY, themeState.mode)
   apply()
 }
@@ -45,9 +77,7 @@ export function setCornerRadius(value) {
 }
 
 export function toggleTheme() {
-  const current =
-    themeState.mode === 'system' ? (themeState.systemDark ? 'dark' : 'light') : themeState.mode
-  setTheme(current === 'dark' ? 'light' : 'dark')
+  setTheme(isDarkTheme(themeState.effective) ? 'light' : 'dark')
 }
 
 export function initTheme() {
@@ -61,5 +91,14 @@ export function initTheme() {
 }
 
 export function useTheme() {
-  return { themeState, setTheme, setDensity, setCornerRadius, toggleTheme, initTheme }
+  return {
+    themeState,
+    setTheme,
+    setDensity,
+    setCornerRadius,
+    toggleTheme,
+    initTheme,
+    isDarkTheme,
+    resolveTheme,
+  }
 }
