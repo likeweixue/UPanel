@@ -74,7 +74,7 @@ echo "[3/4] 组装发布目录 ..."
 PKG_NAME="upanel-${VERSION}-linux-${ARCH}"
 PKG_DIR="$ROOT/release/$PKG_NAME"
 rm -rf "$PKG_DIR"
-mkdir -p "$PKG_DIR/bin" "$PKG_DIR/web"
+mkdir -p "$PKG_DIR/bin" "$PKG_DIR/web" "$PKG_DIR/themes"
 
 install -m 0755 "$ROOT/build/upanel" "$PKG_DIR/bin/upanel"
 install -m 0755 "$ROOT/build/up"      "$PKG_DIR/bin/up"
@@ -82,6 +82,11 @@ install -m 0755 "$ROOT/build/up"      "$PKG_DIR/bin/up"
 if [ -d "$ROOT/web/dist" ]; then
     # 用 tar 管道拷贝，避免不同 cp 实现在隐藏文件 / 权限上的差异
     (cd "$ROOT/web/dist" && tar -cf - .) | (cd "$PKG_DIR/web" && tar -xf -)
+fi
+
+# 可插拔主题（Flarum 等）
+if [ -d "$ROOT/themes" ]; then
+    (cd "$ROOT/themes" && tar -cf - .) | (cd "$PKG_DIR/themes" && tar -xf -)
 fi
 
 install -m 0755 "$ROOT/scripts/install.sh"    "$PKG_DIR/install.sh"

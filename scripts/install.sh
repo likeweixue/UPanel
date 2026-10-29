@@ -328,6 +328,12 @@ deploy_files() {
         cp -r "$SELF_DIR/web" "$INSTALL_DIR/web"
     fi
 
+    # 可插拔主题：保留用户自己添加的主题，同时更新随包主题
+    if [ -d "$SELF_DIR/themes" ]; then
+        mkdir -p "$INSTALL_DIR/themes"
+        cp -r "$SELF_DIR/themes/." "$INSTALL_DIR/themes/"
+    fi
+
     # 脚本与文档
     for f in uninstall.sh README.md VERSION LICENSE; do
         [ -f "$SELF_DIR/$f" ] && install -m 0644 "$SELF_DIR/$f" "$INSTALL_DIR/$f"

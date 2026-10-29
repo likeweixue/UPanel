@@ -47,6 +47,7 @@
 - 自研 BEM-ish 组件：`Button--icon`、`Dropdown--select`、`DashboardWidget`、`StatusDot`、Modal、Tabs、Toast 等；
 - a11y：`sr-only` 跳转链接、`aria-*`、键盘导航、焦点陷阱、`aria-live` 提示、减少动画偏好；
 - 内置浅色、深色、跟随系统、复古黄、护眼纸、黑金、暗夜橙红主题；标准 / 紧凑密度，移动端适配。
+- 支持 `themes/` 目录中的文件夹式主题（`theme.json` + `theme.css`），放入后刷新/重新加载即可使用，无需重新编译；自带 Flarum 风格主题。
 - 「设置 → 外观」支持界面圆角（默认 4px）、底部栏开关与文字/版本/GitHub 展示；底部栏固定在视口底部。
 - 侧边栏支持折叠为图标栏，底部「菜单设置」可调整菜单显示/隐藏与顺序（保存在当前浏览器）。
 - 新建网站、创建数据库、安装应用、新建/上传文件、计划任务、修改密码等表单使用右侧抽屉面板。
@@ -190,6 +191,8 @@ up 9 password 新密码
 │   ├── upanel               面板主程序
 │   └── up                   命令行工具
 ├── web/                     前端静态资源
+├── themes/                  可插拔主题目录（跟随发布包安装）
+│   └── flarum/              Flarum 风格主题
 ├── install.sh
 ├── uninstall.sh
 ├── VERSION

@@ -1,0 +1,133 @@
+/*
+ * UPanel 可插拔主题：Flarum
+ *
+ * 只调整设计 token 和少量控件质感，不改变 UPanel 的布局结构。
+ * 参考：Flarum 2.0.2 的 4px 圆角、36px 控件高度、系统字体栈与灰蓝配色。
+ */
+html[data-theme="flarum"] {
+  color-scheme: light;
+
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Ubuntu, Cantarell, Oxygen, Roboto, Helvetica, Arial, sans-serif;
+
+  --color-bg: #f7f7f7;
+  --color-bg-soft: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7f7;
+  --color-surface-3: #e8edf2;
+  --color-border: #e8edf2;
+  --color-border-strong: #dbe2ea;
+  --color-text: #111111;
+  --color-text-muted: #667d99;
+  --color-text-subtle: #6c7e93;
+  --color-text-inverse: #ffffff;
+
+  --color-primary: #536f90;
+  --color-primary-hover: #486e9b;
+  --color-primary-active: #3b5d85;
+  --color-primary-soft: #e8edf2;
+  --color-primary-border: #c9d6e4;
+
+  --color-success: #33722d;
+  --color-success-soft: #e8f5e6;
+  --color-warning: #ad6c00;
+  --color-warning-soft: #fff2ae;
+  --color-danger: #d83e3e;
+  --color-danger-hover: #b72f2f;
+  --color-danger-soft: #fbe9e9;
+  --color-info: #486e9b;
+  --color-info-soft: #e8edf2;
+
+  --color-overlay: rgba(83, 111, 144, 0.62);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-pop: 0 7px 15px rgba(0, 0, 0, 0.15);
+
+  --header-h: 52px;
+  --control-h: 36px;
+  --control-h-sm: 28px;
+  --text-xl: 22px;
+
+  /* Flarum 全站统一 4px 圆角；用户调圆角时仍可通过 --radius-ui 联动 */
+  --radius-xs: calc(var(--radius-ui) * 0.5);
+  --radius-sm: var(--radius-ui);
+  --radius: var(--radius-ui);
+  --radius-lg: var(--radius-ui);
+
+  --logo-from: #536f90;
+  --logo-to: #486e9b;
+  --logo-text: #ffffff;
+  --logo-shadow: rgba(83, 111, 144, 0.28);
+}
+
+/* Flarum 的控件是浅灰面，而不是依赖边框区分 */
+html[data-theme="flarum"] .input,
+html[data-theme="flarum"] .textarea,
+html[data-theme="flarum"] .native-select {
+  border-color: transparent;
+  background: var(--color-surface-3);
+}
+
+html[data-theme="flarum"] .input:hover,
+html[data-theme="flarum"] .textarea:hover,
+html[data-theme="flarum"] .native-select:hover {
+  border-color: transparent;
+  background: var(--color-surface-2);
+}
+
+html[data-theme="flarum"] .input:focus,
+html[data-theme="flarum"] .textarea:focus,
+html[data-theme="flarum"] .native-select:focus {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+html[data-theme="flarum"] .btn--secondary {
+  --btn-bg: var(--color-surface-3);
+  --btn-border: transparent;
+  --btn-color: var(--color-text-muted);
+}
+
+html[data-theme="flarum"] .btn--secondary:hover:not(:disabled) {
+  --btn-bg: var(--color-surface-2);
+  --btn-border: var(--color-border-strong);
+  --btn-color: var(--color-text);
+}
+
+html[data-theme="flarum"] .btn {
+  font-weight: 400;
+}
+
+html[data-theme="flarum"] .btn--primary {
+  --btn-color: #ffffff;
+  font-weight: 700;
+}
+
+html[data-theme="flarum"] .page__title {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+html[data-theme="flarum"] .page__header {
+  box-shadow: none;
+}
+
+/* 登录页的填充式输入框使用 scoped 样式，主题下用主色边框提示焦点 */
+html[data-theme="flarum"] .login__field .input:focus {
+  background: var(--color-surface) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* 下拉触发器与输入框保持同一套填充控件语言 */
+html[data-theme="flarum"] .dropdown__trigger {
+  border-color: transparent;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+}
+
+html[data-theme="flarum"] .dropdown__trigger:hover,
+html[data-theme="flarum"] .dropdown__trigger[aria-expanded="true"] {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}

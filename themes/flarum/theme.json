@@ -1,0 +1,10 @@
+{
+  "name": "Flarum",
+  "description": "Flarum 风格：系统字体、4px 圆角、灰蓝配色",
+  "version": "1.0.0",
+  "author": "UPanel",
+  "dark": false,
+  "themeColor": "#f7f7f7",
+  "radius": 4,
+  "swatch": ["#ffffff", "#536f90"]
+}

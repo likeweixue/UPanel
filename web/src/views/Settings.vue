@@ -283,6 +283,9 @@
                 <span class="type-card__desc">{{ option.desc }}</span>
               </button>
             </div>
+            <p class="field__hint">
+              自定义主题：把主题文件夹放入安装目录的 <code class="code--inline">themes/</code> 后，点击「重新加载」即可识别。
+            </p>
             <UField label="界面密度">
               <UDropdownSelect
                 :model-value="themeState.density"
@@ -456,7 +459,7 @@ import { toastError, toastSuccess, toastWarning } from '@/composables/useToast'
 const route = useRoute()
 const router = useRouter()
 const { authState, clear } = useAuth()
-const { themeState, setTheme, setDensity } = useTheme()
+const { themeState, setTheme, setDensity, customThemes, loadCustomThemes } = useTheme()
 
 const tabIds = ['panel', 'account', 'gateway', 'docker', 'appearance', 'about']
 const activeTab = ref(tabIds.includes(route.query.tab) ? route.query.tab : 'panel')
@@ -522,7 +525,7 @@ const logDriverOptions = [
   { value: 'none', label: 'none' },
 ]
 
-const themeOptions = [
+const builtInThemeOptions = [
   { value: 'light', label: '浅色', icon: 'sun', desc: '默认的扁平浅色界面', swatch: ['#ffffff', '#2f6fed'] },
   { value: 'retro-yellow', label: '复古黄', icon: 'sun', desc: '暖黄纸张，护眼', swatch: ['#fbf6ec', '#9a6428'] },
   { value: 'green-paper', label: '护眼纸', icon: 'sun', desc: '绿色纸张，低刺激', swatch: ['#f7faf4', '#3f7a4c'] },
@@ -531,6 +534,16 @@ const themeOptions = [
   { value: 'ember', label: '暗夜橙红', icon: 'moon', desc: '暗色背景，橙红提示', swatch: ['#1c1311', '#ff6b3d'] },
   { value: 'system', label: '跟随系统', icon: 'settings-2', desc: '自动匹配系统主题', swatch: ['#ffffff', '#171a21'] },
 ]
+const themeOptions = computed(() => [
+  ...builtInThemeOptions,
+  ...customThemes.map((theme) => ({
+    value: theme.id,
+    label: theme.name,
+    icon: theme.dark ? 'moon' : 'sun',
+    desc: theme.description || 'themes/ 目录中的本地主题',
+    swatch: theme.swatch,
+  })),
+])
 const densityOptions = [
   { value: 'comfortable', label: '标准密度' },
   { value: 'compact', label: '紧凑密度' },
@@ -568,6 +581,7 @@ function applySettings(data) {
 async function loadAll() {
   loading.value = true
   error.value = ''
+  loadCustomThemes(true)
   try {
     const [settingsRes, infoRes] = await Promise.all([settingsApi.get(), panelApi.info()])
     applySettings(settingsRes.data)
@@ -749,7 +763,7 @@ async function changePassword() {
 function chooseTheme(mode) {
   setTheme(mode)
   settings.theme = mode
-  const option = themeOptions.find((item) => item.value === mode)
+  const option = themeOptions.value.find((item) => item.value === mode)
   toastSuccess('主题已切换', option ? option.label : mode)
 }
 

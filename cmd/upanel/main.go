@@ -59,6 +59,7 @@ func main() {
 	apiPrefix := entry + "/api"
 
 	// ========== 前端静态资源 ==========
+	themeService := service.NewThemeService()
 	assetsDir := filepath.Join(cfg.StaticPath, "assets")
 
 	assetHandler := func(c *gin.Context) {
@@ -89,7 +90,7 @@ func main() {
 	}
 
 	serveIndex := func(c *gin.Context) {
-		indexHTML := loadIndexHTML(cfg.StaticPath, entry)
+		indexHTML := loadIndexHTML(cfg.StaticPath, entry, themeService)
 		if indexHTML == nil {
 			c.Data(http.StatusServiceUnavailable, "text/html; charset=utf-8",
 				[]byte("<h1>UPanel 前端资源缺失</h1><p>请确认 web/ 目录存在，或重新解压发布包。</p>"))
@@ -125,6 +126,12 @@ func main() {
 				"name":    service.NewSettingsService().GetAll().PanelName,
 			})
 		})
+
+		// 文件式主题（登录页也需要加载，因此放在认证组之前）
+		themeHandler := handler.NewThemeHandler()
+		api.GET("/themes", themeHandler.List)
+		api.GET("/themes/:id/theme.css", themeHandler.CSS)
+		api.GET("/themes/:id/assets/*filepath", themeHandler.Asset)
 
 		// 需要认证的路由组
 		authorized := api.Group("/")
@@ -343,7 +350,7 @@ func printBanner(cfg *config.Config, entry string) {
 }
 
 // loadIndexHTML 读取 index.html 并注入 <base>，让前端资源在安全入口下也能正确加载。
-func loadIndexHTML(staticPath, entry string) []byte {
+func loadIndexHTML(staticPath, entry string, themes *service.ThemeService) []byte {
 	raw, err := os.ReadFile(filepath.Join(staticPath, "index.html"))
 	if err != nil {
 		log.Printf("警告: 未找到前端 index.html (%v)，面板界面不可用", err)
@@ -358,6 +365,11 @@ func loadIndexHTML(staticPath, entry string) []byte {
 		raw = bytes.Replace(raw, []byte("<!--UPANEL_BASE-->"), baseTag, 1)
 	} else if !bytes.Contains(raw, []byte("<base ")) {
 		raw = bytes.Replace(raw, []byte("<head>"), []byte("<head>\n    "+string(baseTag)), 1)
+	}
+	if themes != nil {
+		if links := themes.IndexLinks(); links != "" {
+			raw = bytes.Replace(raw, []byte("</head>"), []byte(links+"</head>"), 1)
+		}
 	}
 	return raw
 }
