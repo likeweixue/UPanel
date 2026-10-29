@@ -3,7 +3,7 @@
 轻量级 Linux 服务器运维面板：网站部署、数据库、应用商店、容器、文件与安全审计，
 全部围绕 Docker 与统一 Nginx 网关展开。
 
-当前版本：**v0.1.8**
+当前版本：**v0.1.9**
 
 ---
 
@@ -61,13 +61,13 @@
 
 ```bash
 # 1. 上传（例如 /opt）
-scp upanel-v0.1.8-linux-amd64.tar.gz root@你的服务器:/opt/
+scp upanel-v0.1.9-linux-amd64.tar.gz root@你的服务器:/opt/
 
 # 2. 解压
 ssh root@你的服务器
 cd /opt
-tar -xzf upanel-v0.1.8-linux-amd64.tar.gz
-cd upanel-v0.1.8-linux-amd64
+tar -xzf upanel-v0.1.9-linux-amd64.tar.gz
+cd upanel-v0.1.9-linux-amd64
 
 # 3. 交互式安装
 bash install.sh
@@ -239,8 +239,8 @@ npm run dev
 npm run build
 
 # 一键生成 Linux amd64 发布包
-bash scripts/build-release.sh v0.1.8
-# 产物：release/upanel-v0.1.8-linux-amd64.tar.gz
+bash scripts/build-release.sh v0.1.9
+# 产物：release/upanel-v0.1.9-linux-amd64.tar.gz
 ```
 
 也可以只编译后端：

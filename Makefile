@@ -1,7 +1,7 @@
 .PHONY: build build-cli build-all clean install web release test vet
 
 # 版本号（默认读取 VERSION 文件）
-VERSION?=$(shell cat VERSION 2>/dev/null || echo v0.1.8)
+VERSION?=$(shell cat VERSION 2>/dev/null || echo v0.1.9)
 
 # Go 环境
 export CGO_ENABLED=0

@@ -362,7 +362,7 @@
             </div>
             <div v-if="settings.footerVisible" class="footer-preview" aria-hidden="true">
               <span>{{ settings.footerText || 'UPanel' }}</span>
-              <span v-if="settings.footerShowVersion" class="subtle">{{ panelInfo.version || 'v0.1.8' }}</span>
+              <span v-if="settings.footerShowVersion" class="subtle">{{ panelInfo.version || 'v0.1.9' }}</span>
               <span class="grow" />
               <span v-if="settings.footerShowGithub" class="row" style="gap: 4px">
                 <UIcon name="github" :size="13" /> GitHub

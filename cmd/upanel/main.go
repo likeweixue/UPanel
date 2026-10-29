@@ -21,7 +21,7 @@ import (
 )
 
 // Version 面板版本（编译时通过 -ldflags 注入）
-var Version = "v0.1.8"
+var Version = "v0.1.9"
 
 func main() {
 	// 加载配置
